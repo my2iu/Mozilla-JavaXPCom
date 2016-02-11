@@ -34,6 +34,9 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
+ #include "mozilla/Char16.h"   // Force include this early to prevent build problems with Windows
+#include "nsEmbedString.h"
+
 #include "nsJavaInterfaces.h"
 #include "nsJavaWrapper.h"
 #include "nsJavaXPTCStub.h"
@@ -41,7 +44,7 @@
 #include "jni.h"
 #include "xptcall.h"
 #include "nsIInterfaceInfoManager.h"
-#include "nsString.h"
+#include "nsStringAPI.h"
 #include "nsCRT.h"
 #include "prmem.h"
 #include "nsServiceManagerUtils.h"
@@ -55,7 +58,7 @@ nsresult
 CreateJavaArray(JNIEnv* env, PRUint8 aType, PRUint32 aSize, const nsID& aIID,
                 jobject* aResult)
 {
-  jobject array = nsnull;
+  jobject array = nullptr;
   switch (aType)
   {
     case nsXPTType::T_I8:
@@ -103,7 +106,7 @@ CreateJavaArray(JNIEnv* env, PRUint8 aType, PRUint32 aSize, const nsID& aIID,
     case nsXPTType::T_DOMSTRING:
     case nsXPTType::T_UTF8STRING:
     case nsXPTType::T_CSTRING:
-      array = env->NewObjectArray(aSize, stringClass, nsnull);
+      array = env->NewObjectArray(aSize, stringClass, nullptr);
       break;
 
     case nsXPTType::T_INTERFACE:
@@ -128,13 +131,13 @@ CreateJavaArray(JNIEnv* env, PRUint8 aType, PRUint32 aSize, const nsID& aIID,
         return rv;
 
       // Create proper Java interface name
-      nsCAutoString class_name("org/mozilla/interfaces/");
+      nsEmbedCString class_name("org/mozilla/interfaces/");
       class_name.AppendASCII(iface_name);
       jclass ifaceClass = env->FindClass(class_name.get());
       if (!ifaceClass)
         return NS_ERROR_FAILURE;
 
-      array = env->NewObjectArray(aSize, ifaceClass, nsnull);
+      array = env->NewObjectArray(aSize, ifaceClass, nullptr);
       break;
     }
 
@@ -242,7 +245,7 @@ GetNativeArrayElement(PRUint8 aType, void* aArray, PRUint32 aIndex,
 nsresult
 CreateNativeArray(PRUint8 aType, PRUint32 aSize, void** aResult)
 {
-  void* array = nsnull;
+  void* array = nullptr;
   switch (aType)
   {
     case nsXPTType::T_I8:
@@ -313,6 +316,33 @@ CreateNativeArray(PRUint8 aType, PRUint32 aSize, void** aResult)
   return NS_OK;
 }
 
+// TODO: Is this the correct way to emulate the old behaviour? 
+// TODO: I should probably be setting the aVariant.type all the time maybe?
+void setValIsInterface(nsXPTCVariant &aVariant)
+{
+  // TODO: This ignore the possibility of T_INTERFACE_IS
+  aVariant.type = nsXPTType::T_INTERFACE;
+  aVariant.SetValNeedsCleanup();
+}
+
+void setValIsDOMString(nsXPTCVariant &aVariant)
+{
+  aVariant.type = nsXPTType::T_DOMSTRING;
+  aVariant.SetValNeedsCleanup();
+}
+
+void setValIsCString(nsXPTCVariant &aVariant)
+{
+  aVariant.type = nsXPTType::T_CSTRING;
+  aVariant.SetValNeedsCleanup();
+}
+
+void setValIsUTF8String(nsXPTCVariant &aVariant)
+{
+  aVariant.type = nsXPTType::T_UTF8STRING;
+  aVariant.SetValNeedsCleanup();
+}
+
 /**
  * Handle 'in' and 'inout' params.
  */
@@ -339,11 +369,11 @@ SetupParams(JNIEnv *env, const jobject aParam, PRUint8 aType, PRBool aIsOut,
         if (aIsOut) { // 'inout'
           if (aParam) {
             aVariant.val.i8 = value;
-            aVariant.ptr = &aVariant.val;
+			aVariant.SetIndirect();
           } else {
-            aVariant.ptr = nsnull;
+            aVariant.ptr = nullptr;
           }
-          aVariant.SetPtrIsData();
+          //aVariant.SetPtrIsData();
         } else {  // 'array'
           static_cast<PRInt8*>(aVariant.val.p)[aIndex] = value;
         }
@@ -373,11 +403,12 @@ SetupParams(JNIEnv *env, const jobject aParam, PRUint8 aType, PRBool aIsOut,
               aVariant.val.i16 = value;
             else
               aVariant.val.u8 = value;
-            aVariant.ptr = &aVariant.val;
+			aVariant.SetIndirect();
+            //aVariant.ptr = &aVariant.val;
           } else {
-            aVariant.ptr = nsnull;
+            aVariant.ptr = nullptr;
           }
-          aVariant.SetPtrIsData();
+          //aVariant.SetPtrIsData();
         } else {  // 'array'
           if (aType == nsXPTType::T_I16)
             static_cast<PRInt16*>(aVariant.val.p)[aIndex] = value;
@@ -410,11 +441,12 @@ SetupParams(JNIEnv *env, const jobject aParam, PRUint8 aType, PRBool aIsOut,
               aVariant.val.i32 = value;
             else
               aVariant.val.u16 = value;
-            aVariant.ptr = &aVariant.val;
+			aVariant.SetIndirect();
+            //aVariant.ptr = &aVariant.val;
           } else {
-            aVariant.ptr = nsnull;
+            aVariant.ptr = nullptr;
           }
-          aVariant.SetPtrIsData();
+          //aVariant.SetPtrIsData();
         } else {  // 'array'
           if (aType == nsXPTType::T_I32)
             static_cast<PRInt32*>(aVariant.val.p)[aIndex] = value;
@@ -447,11 +479,12 @@ SetupParams(JNIEnv *env, const jobject aParam, PRUint8 aType, PRBool aIsOut,
               aVariant.val.i64 = value;
             else
               aVariant.val.u32 = value;
-            aVariant.ptr = &aVariant.val;
+			aVariant.SetIndirect();
+            //aVariant.ptr = &aVariant.val;
           } else {
-            aVariant.ptr = nsnull;
+            aVariant.ptr = nullptr;
           }
-          aVariant.SetPtrIsData();
+          //aVariant.SetPtrIsData();
         } else {  // 'array'
           if (aType == nsXPTType::T_I64)
             static_cast<PRInt64*>(aVariant.val.p)[aIndex] = value;
@@ -476,11 +509,12 @@ SetupParams(JNIEnv *env, const jobject aParam, PRUint8 aType, PRBool aIsOut,
         if (aIsOut) { // 'inout'
           if (aParam) {
             aVariant.val.f = value;
-            aVariant.ptr = &aVariant.val;
+			aVariant.SetIndirect();
+            //aVariant.ptr = &aVariant.val;
           } else {
-            aVariant.ptr = nsnull;
+            aVariant.ptr = nullptr;
           }
-          aVariant.SetPtrIsData();
+          //aVariant.SetPtrIsData();
         } else {  // 'array'
           static_cast<float*>(aVariant.val.p)[aIndex] = value;
         }
@@ -511,11 +545,12 @@ SetupParams(JNIEnv *env, const jobject aParam, PRUint8 aType, PRBool aIsOut,
               aVariant.val.d = value;
             else
               aVariant.val.u64 = static_cast<PRUint64>(value);
-            aVariant.ptr = &aVariant.val;
+			aVariant.SetIndirect();
+            //aVariant.ptr = &aVariant.val;
           } else {
-            aVariant.ptr = nsnull;
+            aVariant.ptr = nullptr;
           }
-          aVariant.SetPtrIsData();
+          //aVariant.SetPtrIsData();
         } else {  // 'array'
           if (aType == nsXPTType::T_DOUBLE)
             static_cast<double*>(aVariant.val.p)[aIndex] = value;
@@ -541,11 +576,12 @@ SetupParams(JNIEnv *env, const jobject aParam, PRUint8 aType, PRBool aIsOut,
         if (aIsOut) { // 'inout'
           if (aParam) {
             aVariant.val.b = value;
-            aVariant.ptr = &aVariant.val;
+			aVariant.SetIndirect();
+            //aVariant.ptr = &aVariant.val;
           } else {
-            aVariant.ptr = nsnull;
+            aVariant.ptr = nullptr;
           }
-          aVariant.SetPtrIsData();
+          //aVariant.SetPtrIsData();
         } else {  // 'array'
           static_cast<PRBool*>(aVariant.val.p)[aIndex] = value;
         }
@@ -567,11 +603,12 @@ SetupParams(JNIEnv *env, const jobject aParam, PRUint8 aType, PRBool aIsOut,
         if (aIsOut) { // 'inout'
           if (aParam) {
             aVariant.val.c = value;
-            aVariant.ptr = &aVariant.val;
+			aVariant.SetIndirect();
+            //aVariant.ptr = &aVariant.val;
           } else {
-            aVariant.ptr = nsnull;
+            aVariant.ptr = nullptr;
           }
-          aVariant.SetPtrIsData();
+          //aVariant.SetPtrIsData();
         } else {  // 'array'
           static_cast<char*>(aVariant.val.p)[aIndex] = value;
         }
@@ -593,11 +630,12 @@ SetupParams(JNIEnv *env, const jobject aParam, PRUint8 aType, PRBool aIsOut,
         if (aIsOut) { // 'inout'
           if (aParam) {
             aVariant.val.wc = value;
-            aVariant.ptr = &aVariant.val;
+			aVariant.SetIndirect();
+            //aVariant.ptr = &aVariant.val;
           } else {
-            aVariant.ptr = nsnull;
+            aVariant.ptr = nullptr;
           }
-          aVariant.SetPtrIsData();
+          //aVariant.SetPtrIsData();
         } else {  // 'array'
           static_cast<PRUnichar*>(aVariant.val.p)[aIndex] = value;
         }
@@ -609,7 +647,7 @@ SetupParams(JNIEnv *env, const jobject aParam, PRUint8 aType, PRBool aIsOut,
     case nsXPTType::T_WCHAR_STR:
     {
       LOG(("String\n"));
-      jstring data = nsnull;
+      jstring data = nullptr;
       if (!aIsOut && !aIsArrayElement) {  // 'in'
         data = (jstring) aParam;
       } else if (aParam) {  // 'inout' & 'array'
@@ -617,13 +655,13 @@ SetupParams(JNIEnv *env, const jobject aParam, PRUint8 aType, PRBool aIsOut,
                                                     aIndex);
       }
 
-      void* buf = nsnull;
+      void* buf = nullptr;
       if (data) {
         jsize uniLength = env->GetStringLength(data);
         if (uniLength > 0) {
           if (aType == nsXPTType::T_CHAR_STR) {
             jsize utf8Length = env->GetStringUTFLength(data);
-            buf = nsMemory::Alloc((utf8Length + 1) * sizeof(char));
+            buf = moz_xmalloc((utf8Length + 1) * sizeof(char));
             if (!buf) {
               rv = NS_ERROR_OUT_OF_MEMORY;
               break;
@@ -634,7 +672,7 @@ SetupParams(JNIEnv *env, const jobject aParam, PRUint8 aType, PRBool aIsOut,
             char_str[utf8Length] = '\0';
 
           } else {  // if T_WCHAR_STR
-            buf = nsMemory::Alloc((uniLength + 1) * sizeof(jchar));
+            buf = moz_xmalloc((uniLength + 1) * sizeof(jchar));
             if (!buf) {
               rv = NS_ERROR_OUT_OF_MEMORY;
               break;
@@ -646,7 +684,7 @@ SetupParams(JNIEnv *env, const jobject aParam, PRUint8 aType, PRBool aIsOut,
           }
         } else {
           // create empty string
-          buf = nsMemory::Alloc(2);
+          buf = moz_xmalloc(2);
           if (!buf) {
             rv = NS_ERROR_OUT_OF_MEMORY;
             break;
@@ -658,8 +696,9 @@ SetupParams(JNIEnv *env, const jobject aParam, PRUint8 aType, PRBool aIsOut,
       if (!aIsArrayElement) { // 'in' & 'inout'
         aVariant.val.p = buf;
         if (aIsOut) { // 'inout'
-          aVariant.ptr = &aVariant.val;
-          aVariant.SetPtrIsData();
+		  aVariant.SetIndirect();
+          //aVariant.ptr = &aVariant.val;
+          //aVariant.SetPtrIsData();
         }
       } else {  // 'array'
         if (aType == nsXPTType::T_CHAR_STR) {
@@ -676,7 +715,7 @@ SetupParams(JNIEnv *env, const jobject aParam, PRUint8 aType, PRBool aIsOut,
     case nsXPTType::T_IID:
     {
       LOG(("String(IID)\n"));
-      jstring data = nsnull;
+      jstring data = nullptr;
       if (!aIsOut && !aIsArrayElement) {  // 'in'
         data = (jstring) aParam;
       } else if (aParam) {  // 'inout' & 'array'
@@ -691,7 +730,7 @@ SetupParams(JNIEnv *env, const jobject aParam, PRUint8 aType, PRBool aIsOut,
       }
       if (data) {
         // extract IID string from Java string
-        const char* str = env->GetStringUTFChars(data, nsnull);
+        const char* str = env->GetStringUTFChars(data, nullptr);
         if (!str) {
           rv = NS_ERROR_OUT_OF_MEMORY;
           break;
@@ -707,8 +746,9 @@ SetupParams(JNIEnv *env, const jobject aParam, PRUint8 aType, PRBool aIsOut,
       if (!aIsArrayElement) { // 'in' & 'inout'
         aVariant.val.p = iid;
         if (aIsOut) { // 'inout'
-          aVariant.ptr = &aVariant.val;
-          aVariant.SetPtrIsData();
+		  aVariant.SetIndirect();
+          //aVariant.ptr = &aVariant.val;
+          //aVariant.SetPtrIsData();
         }
       } else {  // 'array'
         static_cast<nsID**>(aVariant.val.p)[aIndex] = iid;
@@ -720,7 +760,7 @@ SetupParams(JNIEnv *env, const jobject aParam, PRUint8 aType, PRBool aIsOut,
     case nsXPTType::T_INTERFACE_IS:
     {
       LOG(("nsISupports\n"));
-      jobject java_obj = nsnull;
+      jobject java_obj = nullptr;
       if (!aIsOut && !aIsArrayElement) {  // 'in'
         java_obj = (jobject) aParam;
       } else if (aParam) {  // 'inout' & 'array'
@@ -763,19 +803,21 @@ SetupParams(JNIEnv *env, const jobject aParam, PRUint8 aType, PRBool aIsOut,
             xpcom_obj = weakref;
             NS_ADDREF((nsISupports*) xpcom_obj);
           } else {
-            xpcom_obj = nsnull;
+            xpcom_obj = nullptr;
           }
         }
       } else {
-        xpcom_obj = nsnull;
+        xpcom_obj = nullptr;
       }
 
       if (!aIsArrayElement) { // 'in' & 'inout'
         aVariant.val.p = xpcom_obj;
-        aVariant.SetValIsInterface();
+		setValIsInterface(aVariant);
+        //aVariant.SetValIsInterface();
         if (aIsOut) { // 'inout'
-          aVariant.ptr = &aVariant.val;
-          aVariant.SetPtrIsData();
+		  aVariant.SetIndirect();
+          //aVariant.ptr = &aVariant.val;
+          //aVariant.SetPtrIsData();
         }
       } else {  // 'array'
         static_cast<void**>(aVariant.val.p)[aIndex] = xpcom_obj;
@@ -795,14 +837,15 @@ SetupParams(JNIEnv *env, const jobject aParam, PRUint8 aType, PRBool aIsOut,
       }
 
       jstring jstr = static_cast<jstring>(aParam);
-      nsAString* str = jstring_to_nsAString(env, jstr);
+      nsString* str = jstring_to_nsString(env, jstr);
       if (!str) {
         rv = NS_ERROR_OUT_OF_MEMORY;
         break;
       }
 
       aVariant.val.p = str;
-      aVariant.SetValIsDOMString();
+      setValIsDOMString(aVariant);
+      //aVariant.SetValIsDOMString();
       break;
     }
 
@@ -818,7 +861,7 @@ SetupParams(JNIEnv *env, const jobject aParam, PRUint8 aType, PRBool aIsOut,
       }
 
       jstring jstr = static_cast<jstring>(aParam);
-      nsACString* str = jstring_to_nsACString(env, jstr);
+      nsCString* str = jstring_to_nsCString(env, jstr);
       if (!str) {
         rv = NS_ERROR_OUT_OF_MEMORY;
         break;
@@ -826,9 +869,11 @@ SetupParams(JNIEnv *env, const jobject aParam, PRUint8 aType, PRBool aIsOut,
 
       aVariant.val.p = str;
       if (aType == nsXPTType::T_CSTRING) {
-        aVariant.SetValIsCString();
+        setValIsCString(aVariant);
+		//aVariant.SetValIsCString();
       } else {
-        aVariant.SetValIsUTF8String();
+        setValIsUTF8String(aVariant);
+		//aVariant.SetValIsUTF8String();
       }
       break;
     }
@@ -849,11 +894,12 @@ SetupParams(JNIEnv *env, const jobject aParam, PRUint8 aType, PRBool aIsOut,
         if (aIsOut) { // 'inout'
           if (aParam) {
             aVariant.val.p = reinterpret_cast<void*>(value);
-            aVariant.ptr = &aVariant.val;
+			aVariant.SetIndirect();
+            //aVariant.ptr = &aVariant.val;
           } else {
-            aVariant.ptr = nsnull;
+            aVariant.ptr = nullptr;
           }
-          aVariant.SetPtrIsData();
+          //aVariant.SetPtrIsData();
         } else {  // 'array'
           static_cast<void**>(aVariant.val.p)[aIndex] =
                   reinterpret_cast<void*>(value);
@@ -864,7 +910,7 @@ SetupParams(JNIEnv *env, const jobject aParam, PRUint8 aType, PRBool aIsOut,
 
     case nsXPTType::T_ARRAY:
     {
-      jobject sourceArray = nsnull;
+      jobject sourceArray = nullptr;
       if (!aIsOut) {  // 'in'
         sourceArray = aParam;
       } else if (aParam) {  // 'inout'
@@ -882,8 +928,9 @@ SetupParams(JNIEnv *env, const jobject aParam, PRUint8 aType, PRBool aIsOut,
       }
 
       if (aIsOut) { // 'inout'
-        aVariant.ptr = &aVariant.val.p;
-        aVariant.SetPtrIsData();
+	    aVariant.SetIndirect();
+        //aVariant.ptr = &aVariant.val.p;
+        //aVariant.SetPtrIsData();
       }
       break;
     }
@@ -894,7 +941,7 @@ SetupParams(JNIEnv *env, const jobject aParam, PRUint8 aType, PRBool aIsOut,
       NS_PRECONDITION(!aIsArrayElement, "sized string array not supported");
       
       LOG(("Sized string\n"));
-      jstring data = nsnull;
+      jstring data = nullptr;
       if (!aIsOut) {  // 'in'
         data = (jstring) aParam;
       } else if (aParam) {  // 'inout'
@@ -918,7 +965,7 @@ SetupParams(JNIEnv *env, const jobject aParam, PRUint8 aType, PRBool aIsOut,
       PRUint32 size_of_char = (aType == nsXPTType::T_PSTRING_SIZE_IS) ?
                               sizeof(char) : sizeof(jchar);
       PRUint32 allocLength = (aArraySize + 1) * size_of_char;
-      void* buf = nsMemory::Alloc(allocLength);
+      void* buf = moz_xmalloc(allocLength);
       if (!buf) {
         rv = NS_ERROR_OUT_OF_MEMORY;
         break;
@@ -926,9 +973,9 @@ SetupParams(JNIEnv *env, const jobject aParam, PRUint8 aType, PRBool aIsOut,
 
       if (data) {
         if (aType == nsXPTType::T_PSTRING_SIZE_IS) {
-          const char* str = env->GetStringUTFChars(data, nsnull);
+          const char* str = env->GetStringUTFChars(data, nullptr);
           if (!str) {
-            nsMemory::Free(buf);
+            moz_free(buf);
             rv = NS_ERROR_OUT_OF_MEMORY;
             break;
           }
@@ -942,8 +989,9 @@ SetupParams(JNIEnv *env, const jobject aParam, PRUint8 aType, PRBool aIsOut,
       
       aVariant.val.p = buf;
       if (aIsOut) { // 'inout'
-        aVariant.ptr = &aVariant.val;
-        aVariant.SetPtrIsData();
+	    aVariant.SetIndirect();
+        //aVariant.ptr = &aVariant.val;
+        //aVariant.SetPtrIsData();
       }
 
       break;
@@ -1099,12 +1147,12 @@ FinalizeParams(JNIEnv *env, const nsXPTParamInfo &aParamInfo, PRUint8 aType,
           NS_SUCCEEDED(aInvokeResult))
       {
         // create new string from data
-        jstring str = nsnull;
+        jstring str = nullptr;
         if (aVariant.val.p) {
           if (aType == nsXPTType::T_CHAR_STR) {
             str = env->NewStringUTF((const char*) aVariant.val.p);
           } else {
-            PRUint32 length = nsCRT::strlen((const PRUnichar*) aVariant.val.p);
+            PRUint32 length = NS_strlen((const PRUnichar*) aVariant.val.p);
             str = env->NewString((const jchar*) aVariant.val.p, length);
           }
           if (!str) {
@@ -1123,7 +1171,7 @@ FinalizeParams(JNIEnv *env, const nsXPTParamInfo &aParamInfo, PRUint8 aType,
 
       // cleanup
       if (aVariant.val.p)
-        nsMemory::Free(aVariant.val.p);
+        moz_free(aVariant.val.p);
       break;
     }
 
@@ -1135,7 +1183,7 @@ FinalizeParams(JNIEnv *env, const nsXPTParamInfo &aParamInfo, PRUint8 aType,
           NS_SUCCEEDED(aInvokeResult))
       {
         // Create the string from nsID
-        jstring str = nsnull;
+        jstring str = nullptr;
         if (iid) {
           char iid_str[NSID_LENGTH];
           iid->ToProvidedString(iid_str);
@@ -1171,10 +1219,10 @@ FinalizeParams(JNIEnv *env, const nsXPTParamInfo &aParamInfo, PRUint8 aType,
       if ((aParamInfo.IsOut() || aIsArrayElement) &&
           NS_SUCCEEDED(aInvokeResult))
       {
-        jobject java_obj = nsnull;
+        jobject java_obj = nullptr;
         if (xpcom_obj) {
           // Get matching Java object for given xpcom object
-          rv = NativeInterfaceToJavaObject(env, xpcom_obj, aIID, nsnull,
+          rv = NativeInterfaceToJavaObject(env, xpcom_obj, aIID, nullptr,
                                            &java_obj);
           if (NS_FAILED(rv))
             break;
@@ -1205,7 +1253,7 @@ FinalizeParams(JNIEnv *env, const nsXPTParamInfo &aParamInfo, PRUint8 aType,
       nsString* str = static_cast<nsString*>(aVariant.val.p);
       if (NS_SUCCEEDED(aInvokeResult) && aParamInfo.IsDipper()) {
         // Create Java string from returned nsString
-        jstring jstr = nsnull;
+        jstring jstr = nullptr;
         if (str && !str->IsVoid()) {
           jstr = env->NewString((const jchar*) str->get(), str->Length());
           if (!jstr) {
@@ -1236,7 +1284,7 @@ FinalizeParams(JNIEnv *env, const nsXPTParamInfo &aParamInfo, PRUint8 aType,
       nsCString* str = static_cast<nsCString*>(aVariant.val.p);
       if (NS_SUCCEEDED(aInvokeResult) && aParamInfo.IsDipper()) {
         // Create Java string from returned nsString
-        jstring jstr = nsnull;
+        jstring jstr = nullptr;
         if (str && !str->IsVoid()) {
           jstr = env->NewStringUTF((const char*) str->get());
           if (!jstr) {
@@ -1272,7 +1320,7 @@ FinalizeParams(JNIEnv *env, const nsXPTParamInfo &aParamInfo, PRUint8 aType,
     {
       if (aParamInfo.IsOut() && NS_SUCCEEDED(aInvokeResult)) {
         // Create Java array from returned native array
-        jobject jarray = nsnull;
+        jobject jarray = nullptr;
         if (aVariant.val.p) {
           rv = CreateJavaArray(env, aArrayType, aArraySize, aIID, &jarray);
           if (NS_FAILED(rv))
@@ -1305,7 +1353,7 @@ FinalizeParams(JNIEnv *env, const nsXPTParamInfo &aParamInfo, PRUint8 aType,
           rv = GetNativeArrayElement(aArrayType, aVariant.val.p, i, &var);
           if (NS_SUCCEEDED(rv)) {
             FinalizeParams(env, aParamInfo, aArrayType, var, aIID, PR_TRUE,
-                           0, 0, i, NS_ERROR_FAILURE, nsnull);
+                           0, 0, i, NS_ERROR_FAILURE, nullptr);
           }
         }
       }
@@ -1321,16 +1369,16 @@ FinalizeParams(JNIEnv *env, const nsXPTParamInfo &aParamInfo, PRUint8 aType,
       if ((aParamInfo.IsOut()) && NS_SUCCEEDED(aInvokeResult))
       {
         // create new string from data
-        jstring str = nsnull;
+        jstring str = nullptr;
         if (aVariant.val.p) {
           if (aType == nsXPTType::T_PSTRING_SIZE_IS) {
             PRUint32 len = (aArraySize + 1) * sizeof(char);
-            char* buf = (char*) nsMemory::Alloc(len);
+            char* buf = (char*) moz_xmalloc(len);
             if (buf) {
               memcpy(buf, aVariant.val.p, len);
               buf[aArraySize] = '\0';
               str = env->NewStringUTF((const char*) buf);
-              nsMemory::Free(buf);
+              moz_free(buf);
             }
           } else {
             str = env->NewString((const jchar*) aVariant.val.p, aArraySize);
@@ -1351,7 +1399,7 @@ FinalizeParams(JNIEnv *env, const nsXPTParamInfo &aParamInfo, PRUint8 aType,
 
       // cleanup
       if (aVariant.val.p)
-        nsMemory::Free(aVariant.val.p);
+        moz_free(aVariant.val.p);
       break;
     }
 
@@ -1476,8 +1524,8 @@ JAVAPROXY_NATIVE(callXPCOMMethod) (JNIEnv *env, jclass that, jobject aJavaProxy,
   void* xpcom_obj;
   rv = GetXPCOMInstFromProxy(env, aJavaProxy, &xpcom_obj);
   if (NS_FAILED(rv)) {
-    ThrowException(env, 0, "Failed to get matching XPCOM object");
-    return nsnull;
+    ThrowException(env, rv, "Failed to get matching XPCOM object");
+    return nullptr;
   }
   JavaXPCOMInstance* inst = static_cast<JavaXPCOMInstance*>(xpcom_obj);
 
@@ -1485,13 +1533,13 @@ JAVAPROXY_NATIVE(callXPCOMMethod) (JNIEnv *env, jclass that, jobject aJavaProxy,
   PRUint16 methodIndex;
   const nsXPTMethodInfo* methodInfo;
   nsIInterfaceInfo* iinfo = inst->InterfaceInfo();
-  const char* methodName = env->GetStringUTFChars(aMethodName, nsnull);
+  const char* methodName = env->GetStringUTFChars(aMethodName, nullptr);
   rv = QueryMethodInfo(iinfo, methodName, &methodIndex, &methodInfo);
   env->ReleaseStringUTFChars(aMethodName, methodName);
 
   if (NS_FAILED(rv)) {
     ThrowException(env, rv, "GetMethodInfoForName failed");
-    return nsnull;
+    return nullptr;
   }
 
 #ifdef DEBUG_JAVAXPCOM
@@ -1502,13 +1550,13 @@ JAVAPROXY_NATIVE(callXPCOMMethod) (JNIEnv *env, jclass that, jobject aJavaProxy,
 
   // Convert the Java params
   PRUint8 paramCount = methodInfo->GetParamCount();
-  nsXPTCVariant* params = nsnull;
+  nsXPTCVariant* params = nullptr;
   if (paramCount)
   {
     params = new nsXPTCVariant[paramCount];
     if (!params) {
       ThrowException(env, NS_ERROR_OUT_OF_MEMORY, "Can't create params array");
-      return nsnull;
+      return nullptr;
     }
     memset(params, 0, paramCount * sizeof(nsXPTCVariant));
 
@@ -1535,7 +1583,7 @@ JAVAPROXY_NATIVE(callXPCOMMethod) (JNIEnv *env, jclass that, jobject aJavaProxy,
         }
 
         if (NS_SUCCEEDED(rv)) {
-          jobject param = nsnull;
+          jobject param = nullptr;
           if (aParams && !paramInfo.IsRetval()) {
             param = env->GetObjectArrayElement(aParams, i);
           }
@@ -1544,8 +1592,9 @@ JAVAPROXY_NATIVE(callXPCOMMethod) (JNIEnv *env, jclass that, jobject aJavaProxy,
         }
       } else {
         LOG(("out/retval\n"));
-        params[i].ptr = &(params[i].val);
-        params[i].SetPtrIsData();
+		params[i].SetIndirect();
+        //params[i].ptr = &(params[i].val);
+        //params[i].SetPtrIsData();
       }
     }
     
@@ -1607,7 +1656,7 @@ JAVAPROXY_NATIVE(callXPCOMMethod) (JNIEnv *env, jclass that, jobject aJavaProxy,
           }
 
           if (NS_SUCCEEDED(rv)) {
-            jobject param = nsnull;
+            jobject param = nullptr;
             if (aParams && !paramInfo.IsRetval()) {
               param = env->GetObjectArrayElement(aParams, j);
             }
@@ -1620,7 +1669,7 @@ JAVAPROXY_NATIVE(callXPCOMMethod) (JNIEnv *env, jclass that, jobject aJavaProxy,
     
     if (NS_FAILED(rv)) {
       ThrowException(env, rv, "SetupParams failed");
-      return nsnull;
+      return nullptr;
     }
   }
 
@@ -1631,14 +1680,14 @@ JAVAPROXY_NATIVE(callXPCOMMethod) (JNIEnv *env, jclass that, jobject aJavaProxy,
   rv = inst->GetInstance()->QueryInterface(*iid, (void**) &realObject);
   if (NS_FAILED(rv)) {
     ThrowException(env, rv, "Failed to get real XPCOM object");
-    return nsnull;
+    return nullptr;
   }
   nsresult invokeResult = NS_InvokeByIndex(realObject, methodIndex,
                                            paramCount, params);
   NS_RELEASE(realObject);
 
   // Clean up params
-  jobject result = nsnull;
+  jobject result = nullptr;
   for (PRUint8 i = 0; i < paramCount && NS_SUCCEEDED(rv); i++)
   {
     const nsXPTParamInfo &paramInfo = methodInfo->GetParam(i);
@@ -1720,14 +1769,14 @@ JAVAPROXY_NATIVE(callXPCOMMethod) (JNIEnv *env, jclass that, jobject aJavaProxy,
   // If the XPCOM method invocation failed, we don't immediately throw an
   // exception and return so that we can clean up any parameters.
   if (NS_FAILED(invokeResult)) {
-    nsCAutoString message("The function \"");
+    nsEmbedCString message("The function \"");
     message.AppendASCII(methodInfo->GetName());
     message.AppendLiteral("\" returned an error condition");
     ThrowException(env, invokeResult, message.get());
   }
   if (NS_FAILED(rv)) {
     ThrowException(env, rv, "FinalizeParams failed");
-    return nsnull;
+    return nullptr;
   }
 
   LOG(("<=== (XPCOM) %s::%s()\n", ifaceName, methodInfo->GetName()));
@@ -1739,7 +1788,7 @@ GetNewOrUsedJavaWrapper(JNIEnv* env, nsISupports* aXPCOMObject,
                         const nsIID& aIID, jobject aObjectLoader,
                         jobject* aResult)
 {
-  NS_PRECONDITION(aResult != nsnull, "null ptr");
+  NS_PRECONDITION(aResult != nullptr, "null ptr");
   if (!aResult)
     return NS_ERROR_NULL_POINTER;
 
@@ -1779,10 +1828,10 @@ GetNewOrUsedJavaWrapper(JNIEnv* env, nsISupports* aXPCOMObject,
   rv = info->GetNameShared(&iface_name);
 
   if (NS_SUCCEEDED(rv)) {
-    jobject java_obj = nsnull;
+    jobject java_obj = nullptr;
 
     // Create proper Java interface name
-    nsCAutoString class_name("org.mozilla.interfaces.");
+    nsEmbedCString class_name("org.mozilla.interfaces.");
     class_name.AppendASCII(iface_name);
     jclass ifaceClass = FindClassInLoader(env, aObjectLoader, class_name.get());
 
@@ -1791,7 +1840,7 @@ GetNewOrUsedJavaWrapper(JNIEnv* env, nsISupports* aXPCOMObject,
                                              createProxyMID, ifaceClass,
                                              reinterpret_cast<jlong>(inst));
       if (env->ExceptionCheck())
-        java_obj = nsnull;
+        java_obj = nullptr;
     }
 
     if (java_obj) {
@@ -1823,7 +1872,7 @@ GetNewOrUsedJavaWrapper(JNIEnv* env, nsISupports* aXPCOMObject,
 nsresult
 GetXPCOMInstFromProxy(JNIEnv* env, jobject aJavaObject, void** aResult)
 {
-  NS_PRECONDITION(aResult != nsnull, "null ptr");
+  NS_PRECONDITION(aResult != nullptr, "null ptr");
   if (!aResult)
     return NS_ERROR_NULL_POINTER;
 
@@ -1845,7 +1894,7 @@ GetXPCOMInstFromProxy(JNIEnv* env, jobject aJavaObject, void** aResult)
                                            aJavaObject),
        (PRUint32) inst->GetInstance(), iid_str));
   NS_Free(iid_str);
-  nsMemory::Free(iid);
+  moz_free(iid);
 #endif
   return NS_OK;
 }
@@ -1884,7 +1933,7 @@ JAVAPROXY_NATIVE(finalizeProxy) (JNIEnv *env, jclass that, jobject aJavaProxy)
         rv = inst->InterfaceInfo()->GetInterfaceIID(&iid);
         if (NS_SUCCEEDED(rv)) {
           rv = gNativeToJavaProxyMap->Remove(env, inst->GetInstance(), *iid);
-          nsMemory::Free(iid);
+          moz_free(iid);
         }
         NS_ASSERTION(NS_SUCCEEDED(rv), "Failed to RemoveJavaProxy");
         // Release gJavaXPCOMLock before deleting inst (see bug 340022)

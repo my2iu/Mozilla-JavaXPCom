@@ -38,6 +38,8 @@
 #ifndef _nsJavaXPTCStubWeakRef_h_
 #define _nsJavaXPTCStubWeakRef_h_
 
+#include "nscore.h"
+
 #include "jni.h"
 #include "nsIWeakReference.h"
 
@@ -54,6 +56,7 @@ public:
   virtual ~nsJavaXPTCStubWeakRef();
   NS_DECL_ISUPPORTS
   NS_DECL_NSIWEAKREFERENCE
+  virtual size_t SizeOfOnlyThis(mozilla::MallocSizeOf aMallocSizeOf) const override;
 
 protected:
   jobject         mWeakRef;

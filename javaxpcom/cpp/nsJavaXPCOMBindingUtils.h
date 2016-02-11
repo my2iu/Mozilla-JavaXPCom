@@ -41,7 +41,7 @@
 #include "jni.h"
 #include "xptcall.h"
 #include "nsCOMPtr.h"
-#include "nsString.h"
+#include "nsStringAPI.h"
 #include "pldhash.h"
 #include "nsJavaXPTCStub.h"
 #include "nsAutoLock.h"
@@ -191,12 +191,12 @@ protected:
 
 public:
   NativeToJavaProxyMap()
-    : mHashTable(nsnull)
+    : mHashTable(nullptr)
   { }
 
   ~NativeToJavaProxyMap()
   {
-    NS_ASSERTION(mHashTable == nsnull,
+    NS_ASSERTION(mHashTable == nullptr,
                  "MUST call Destroy() before deleting object");
   }
 
@@ -234,12 +234,12 @@ protected:
 
 public:
   JavaToXPTCStubMap()
-    : mHashTable(nsnull)
+    : mHashTable(nullptr)
   { }
 
   ~JavaToXPTCStubMap()
   {
-    NS_ASSERTION(mHashTable == nsnull,
+    NS_ASSERTION(mHashTable == nullptr,
                  "MUST call Destroy() before deleting object");
   }
 
@@ -316,7 +316,7 @@ nsresult GetIIDForMethodParam(nsIInterfaceInfo *iinfo,
 inline jclass
 FindClassInLoader(JNIEnv* env, jobject aObjectLoader, const char* aClassName)
 {
-  jclass clazz = nsnull;
+  jclass clazz = nullptr;
   jstring name = env->NewStringUTF(aClassName);
   if (name)
     clazz = (jclass) env->CallStaticObjectMethod(javaXPCOMUtilsClass,
@@ -353,7 +353,7 @@ JNIEnv* GetJNIEnv();
  * @param aErrorCode  The error code returned by an XPCOM/Gecko function. Pass
  *                    zero for the default behaviour.
  * @param aMessage    A string that provides details for throwing this
- *                    exception. Pass in <code>nsnull</code> for the default
+ *                    exception. Pass in <code>nullptr</code> for the default
  *                    behaviour.
  *
  * @throws OutOfMemoryError if aErrorCode == NS_ERROR_OUT_OF_MEMORY
@@ -371,10 +371,10 @@ void ThrowException(JNIEnv* env, const nsresult aErrorCode,
  *
  * @return  nsAString/nsACString with same content as given Java string;
  *          a 'void' nsAString/nsACString object if aString is
- *          <code>null</code>; or <code>nsnull</code> if out of memory
+ *          <code>null</code>; or <code>nullptr</code> if out of memory
  */
-nsAString* jstring_to_nsAString(JNIEnv* env, jstring aString);
-nsACString* jstring_to_nsACString(JNIEnv* env, jstring aString);
+nsString* jstring_to_nsString(JNIEnv* env, jstring aString);
+nsCString* jstring_to_nsCString(JNIEnv* env, jstring aString);
 
 /**
  * Helper function for converting from java.io.File to nsILocalFile.
@@ -386,6 +386,6 @@ nsACString* jstring_to_nsACString(JNIEnv* env, jstring aString);
  * @return  NS_OK for success; other values indicate error in conversion
  */
 nsresult File_to_nsILocalFile(JNIEnv* env, jobject aFile,
-                              nsILocalFile** aLocalFile);
+                              nsIFile** aLocalFile);
 
 #endif // _nsJavaXPCOMBindingUtils_h_

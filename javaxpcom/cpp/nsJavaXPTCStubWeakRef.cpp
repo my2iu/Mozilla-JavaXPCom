@@ -35,6 +35,9 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
+#include "mozilla/Char16.h"   // Force include this early to prevent build problems with Windows
+#include "nsISupportsImpl.h" 
+
 #include "jni.h"
 #include "nsJavaXPTCStubWeakRef.h"
 #include "nsJavaXPTCStub.h"
@@ -77,7 +80,7 @@ nsJavaXPTCStubWeakRef::~nsJavaXPTCStubWeakRef()
 NS_IMPL_ADDREF(nsJavaXPTCStubWeakRef)
 NS_IMPL_RELEASE(nsJavaXPTCStubWeakRef)
 
-NS_IMPL_QUERY_INTERFACE1(nsJavaXPTCStubWeakRef, nsIWeakReference)
+NS_IMPL_QUERY_INTERFACE(nsJavaXPTCStubWeakRef, nsIWeakReference)
 
 NS_IMETHODIMP
 nsJavaXPTCStubWeakRef::QueryReferent(const nsIID& aIID, void** aInstancePtr)
@@ -96,3 +99,8 @@ nsJavaXPTCStubWeakRef::QueryReferent(const nsIID& aIID, void** aInstancePtr)
   return mXPTCStub->QueryInterface(aIID, aInstancePtr);
 }
 
+size_t
+nsJavaXPTCStubWeakRef::SizeOfOnlyThis(mozilla::MallocSizeOf aMallocSizeOf) const
+{
+  return aMallocSizeOf(this);
+}

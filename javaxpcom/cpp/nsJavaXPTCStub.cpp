@@ -35,25 +35,27 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
+#include "mozilla/Char16.h"   // Force include this early to prevent build problems with Windows
+#include "nsEmbedString.h"
+
 #include "nsJavaXPTCStub.h"
 #include "nsJavaWrapper.h"
 #include "nsJavaXPCOMBindingUtils.h"
 #include "prmem.h"
 #include "nsIInterfaceInfoManager.h"
-#include "nsString.h"
-#include "nsString.h"
+#include "nsStringAPI.h"
 #include "nsCRT.h"
 #include "nsServiceManagerUtils.h"
 
 
 nsJavaXPTCStub::nsJavaXPTCStub(jobject aJavaObject, nsIInterfaceInfo *aIInfo,
                                nsresult *rv)
-  : mJavaStrongRef(nsnull)
+  : mJavaStrongRef(nullptr)
   , mIInfo(aIInfo)
-  , mMaster(nsnull)
+  , mMaster(nullptr)
   , mWeakRefCnt(0)
 {
-  const nsIID *iid = nsnull;
+  const nsIID *iid = nullptr;
   aIInfo->GetIIDShared(&iid);
   NS_ASSERTION(iid, "GetIIDShared must not fail!");
 
@@ -80,7 +82,7 @@ nsJavaXPTCStub::~nsJavaXPTCStub()
 {
 }
 
-NS_IMETHODIMP_(nsrefcnt)
+NS_IMETHODIMP_(MozExternalRefCountType)
 nsJavaXPTCStub::AddRefInternal()
 {
   // If this is the first AddRef call, we create a strong global ref to the
@@ -91,7 +93,7 @@ nsJavaXPTCStub::AddRefInternal()
     if (!env->IsSameObject(referent, NULL)) {
       mJavaStrongRef = env->NewGlobalRef(referent);
     }
-    NS_ASSERTION(mJavaStrongRef != nsnull, "Failed to acquire strong ref");
+    NS_ASSERTION(mJavaStrongRef != nullptr, "Failed to acquire strong ref");
   }
 
   // if this is the master interface
@@ -102,7 +104,7 @@ nsJavaXPTCStub::AddRefInternal()
   return mRefCnt;
 }
 
-NS_IMETHODIMP_(nsrefcnt)
+NS_IMETHODIMP_(MozExternalRefCountType)
 nsJavaXPTCStub::AddRef()
 {
 #ifdef DEBUG_JAVAXPCOM_REFCNT
@@ -120,7 +122,7 @@ nsJavaXPTCStub::AddRef()
   return master->AddRefInternal();
 }
 
-NS_IMETHODIMP_(nsrefcnt)
+NS_IMETHODIMP_(MozExternalRefCountType)
 nsJavaXPTCStub::ReleaseInternal()
 {
   NS_PRECONDITION(0 != mRefCnt, "dup release");
@@ -142,7 +144,7 @@ nsJavaXPTCStub::ReleaseInternal()
   return mRefCnt;
 }
 
-NS_IMETHODIMP_(nsrefcnt)
+NS_IMETHODIMP_(MozExternalRefCountType)
 nsJavaXPTCStub::Release()
 {
 #ifdef DEBUG_JAVAXPCOM_REFCNT
@@ -215,11 +217,11 @@ nsJavaXPTCStub::ReleaseWeakRef()
 void
 nsJavaXPTCStub::DeleteStrongRef()
 {
-  if (mJavaStrongRef == nsnull)
+  if (mJavaStrongRef == nullptr)
     return;
 
   GetJNIEnv()->DeleteGlobalRef(mJavaStrongRef);
-  mJavaStrongRef = nsnull;
+  mJavaStrongRef = nullptr;
 }
 
 NS_IMETHODIMP
@@ -228,7 +230,7 @@ nsJavaXPTCStub::QueryInterface(const nsID &aIID, void **aInstancePtr)
   nsresult rv;
 
   LOG(("JavaStub::QueryInterface()\n"));
-  *aInstancePtr = nsnull;
+  *aInstancePtr = nullptr;
   nsJavaXPTCStub *master = mMaster ? mMaster : this;
 
   // This helps us differentiate between the help classes.
@@ -284,7 +286,7 @@ nsJavaXPTCStub::QueryInterface(const nsID &aIID, void **aInstancePtr)
   }
 
   // construct IID string
-  jstring iid_jstr = nsnull;
+  jstring iid_jstr = nullptr;
   char* iid_str = aIID.ToString();
   if (iid_str) {
     iid_jstr = env->NewStringUTF(iid_str);
@@ -352,10 +354,10 @@ nsJavaXPTCStub::QueryInterface(const nsID &aIID, void **aInstancePtr)
   return NS_OK;
 }
 
-PRBool
+bool
 nsJavaXPTCStub::SupportsIID(const nsID &iid)
 {
-  PRBool match;
+  bool match;
   nsCOMPtr<nsIInterfaceInfo> iter = mIInfo;
   do
   {
@@ -366,7 +368,7 @@ nsJavaXPTCStub::SupportsIID(const nsID &iid)
     iter->GetParent(getter_AddRefs(parent));
     iter = parent;
   }
-  while (iter != nsnull);
+  while (iter != nullptr);
 
   return PR_FALSE;
 }
@@ -374,7 +376,7 @@ nsJavaXPTCStub::SupportsIID(const nsID &iid)
 nsJavaXPTCStub *
 nsJavaXPTCStub::FindStubSupportingIID(const nsID &iid)
 {
-  NS_ASSERTION(mMaster == nsnull, "this is not a master stub");
+  NS_ASSERTION(mMaster == nullptr, "this is not a master stub");
 
   if (SupportsIID(iid))
     return this;
@@ -385,7 +387,7 @@ nsJavaXPTCStub::FindStubSupportingIID(const nsID &iid)
     if (child->SupportsIID(iid))
       return child;
   }
-  return nsnull;
+  return nullptr;
 }
 
 NS_IMETHODIMP
@@ -403,12 +405,12 @@ nsJavaXPTCStub::CallMethod(PRUint16 aMethodIndex,
   JNIEnv* env = GetJNIEnv();
   jobject javaObject = env->CallObjectMethod(mJavaWeakRef, getReferentMID);
 
-  nsCAutoString methodSig("(");
+  nsEmbedCString methodSig("(");
 
   // Create jvalue array to hold Java params
   PRUint8 paramCount = aMethodInfo->num_args;
-  jvalue* java_params = nsnull;
-  const nsXPTParamInfo* retvalInfo = nsnull;
+  jvalue* java_params = nullptr;
+  const nsXPTParamInfo* retvalInfo = nullptr;
   if (paramCount) {
     java_params = new jvalue[paramCount];
     if (!java_params)
@@ -431,7 +433,7 @@ nsJavaXPTCStub::CallMethod(PRUint16 aMethodIndex,
   if (NS_SUCCEEDED(rv)) {
     methodSig.Append(')');
     if (retvalInfo) {
-      nsCAutoString retvalSig;
+      nsEmbedCString retvalSig;
       rv = GetRetvalSig(retvalInfo, aMethodInfo, aMethodIndex, aParams,
                         retvalSig);
       methodSig.Append(retvalSig);
@@ -442,9 +444,9 @@ nsJavaXPTCStub::CallMethod(PRUint16 aMethodIndex,
   }
 
   // Get Java method to call
-  jmethodID mid = nsnull;
+  jmethodID mid = nullptr;
   if (NS_SUCCEEDED(rv)) {
-    nsCAutoString methodName;
+    nsEmbedCString methodName;
     if (XPT_MD_IS_GETTER(aMethodInfo->flags) ||
         XPT_MD_IS_SETTER(aMethodInfo->flags)) {
       if (XPT_MD_IS_GETTER(aMethodInfo->flags))
@@ -546,11 +548,12 @@ nsJavaXPTCStub::CallMethod(PRUint16 aMethodIndex,
       if (env->IsInstanceOf(exp, xpcomExceptionClass)) {
         jfieldID fid;
         fid = env->GetFieldID(xpcomExceptionClass, "errorcode", "J");
-        if (fid) {
-          rv = env->GetLongField(exp, fid);
-        } else {
+// TODO: Fix proper error codes		
+//        if (fid) {
+//          rv = env->GetLongField(exp, fid);
+//        } else {
           rv = NS_ERROR_FAILURE;
-        }
+//        }
         NS_ASSERTION(fid, "Couldn't get 'errorcode' field of XPCOMException");
       } else {
         rv = NS_ERROR_FAILURE;
@@ -567,7 +570,7 @@ nsJavaXPTCStub::CallMethod(PRUint16 aMethodIndex,
         continue;
 
       // If param is null, then caller is not expecting an output value.
-      if (aParams[i].val.p == nsnull)
+      if (aParams[i].val.p == nullptr)
         continue;
 
       if (!paramInfo.IsRetval()) {
@@ -628,7 +631,7 @@ nsJavaXPTCStub::SetupJavaParams(const nsXPTParamInfo &aParamInfo,
           env->SetByteArrayRegion(array, 0, 1, (jbyte*) aVariant.val.p);
           aJValue.l = array;
         } else {
-          aJValue.l = nsnull;
+          aJValue.l = nullptr;
         }
         aMethodSig.AppendLiteral("[B");
       }
@@ -653,7 +656,7 @@ nsJavaXPTCStub::SetupJavaParams(const nsXPTParamInfo &aParamInfo,
           env->SetShortArrayRegion(array, 0, 1, (jshort*) aVariant.val.p);
           aJValue.l = array;
         } else {
-          aJValue.l = nsnull;
+          aJValue.l = nullptr;
         }
         aMethodSig.AppendLiteral("[S");
       }
@@ -678,7 +681,7 @@ nsJavaXPTCStub::SetupJavaParams(const nsXPTParamInfo &aParamInfo,
           env->SetIntArrayRegion(array, 0, 1, (jint*) aVariant.val.p);
           aJValue.l = array;
         } else {
-          aJValue.l = nsnull;
+          aJValue.l = nullptr;
         }
         aMethodSig.AppendLiteral("[I");
       }
@@ -703,7 +706,7 @@ nsJavaXPTCStub::SetupJavaParams(const nsXPTParamInfo &aParamInfo,
           env->SetLongArrayRegion(array, 0, 1, (jlong*) aVariant.val.p);
           aJValue.l = array;
         } else {
-          aJValue.l = nsnull;
+          aJValue.l = nullptr;
         }
         aMethodSig.AppendLiteral("[J");
       }
@@ -726,7 +729,7 @@ nsJavaXPTCStub::SetupJavaParams(const nsXPTParamInfo &aParamInfo,
           env->SetFloatArrayRegion(array, 0, 1, (jfloat*) aVariant.val.p);
           aJValue.l = array;
         } else {
-          aJValue.l = nsnull;
+          aJValue.l = nullptr;
         }
         aMethodSig.AppendLiteral("[F");
       }
@@ -752,7 +755,7 @@ nsJavaXPTCStub::SetupJavaParams(const nsXPTParamInfo &aParamInfo,
           env->SetDoubleArrayRegion(array, 0, 1, (jdouble*) aVariant.val.p);
           aJValue.l = array;
         } else {
-          aJValue.l = nsnull;
+          aJValue.l = nullptr;
         }
         aMethodSig.AppendLiteral("[D");
       }
@@ -775,7 +778,7 @@ nsJavaXPTCStub::SetupJavaParams(const nsXPTParamInfo &aParamInfo,
           env->SetBooleanArrayRegion(array, 0, 1, (jboolean*) aVariant.val.p);
           aJValue.l = array;
         } else {
-          aJValue.l = nsnull;
+          aJValue.l = nullptr;
         }
         aMethodSig.AppendLiteral("[Z");
       }
@@ -802,7 +805,7 @@ nsJavaXPTCStub::SetupJavaParams(const nsXPTParamInfo &aParamInfo,
           env->SetCharArrayRegion(array, 0, 1, (jchar*) aVariant.val.p);
           aJValue.l = array;
         } else {
-          aJValue.l = nsnull;
+          aJValue.l = nullptr;
         }
         aMethodSig.AppendLiteral("[C");
       }
@@ -812,7 +815,7 @@ nsJavaXPTCStub::SetupJavaParams(const nsXPTParamInfo &aParamInfo,
     case nsXPTType::T_CHAR_STR:
     case nsXPTType::T_WCHAR_STR:
     {
-      void* ptr = nsnull;
+      void* ptr = nullptr;
       if (!aParamInfo.IsOut()) {  // 'in'
         ptr = aVariant.val.p;
       } else if (aVariant.val.p) {  // 'inout' & 'out'
@@ -826,14 +829,14 @@ nsJavaXPTCStub::SetupJavaParams(const nsXPTParamInfo &aParamInfo,
           str = env->NewStringUTF((const char*) ptr);
         } else {
           const PRUnichar* buf = (const PRUnichar*) ptr;
-          str = env->NewString(buf, nsCRT::strlen(buf));
+          str = env->NewString(reinterpret_cast<const jchar *>(buf), NS_strlen(buf));
         }
         if (!str) {
           rv = NS_ERROR_OUT_OF_MEMORY;
           break;
         }
       } else {
-        str = nsnull;
+        str = nullptr;
       }
 
       if (!aParamInfo.IsOut()) {  // 'in'
@@ -842,12 +845,12 @@ nsJavaXPTCStub::SetupJavaParams(const nsXPTParamInfo &aParamInfo,
       } else {  // 'inout' & 'out'
         if (aVariant.val.p) {
           aJValue.l = env->NewObjectArray(1, stringClass, str);
-          if (aJValue.l == nsnull) {
+          if (aJValue.l == nullptr) {
             rv = NS_ERROR_OUT_OF_MEMORY;
             break;
           }
         } else {
-          aJValue.l = nsnull;
+          aJValue.l = nullptr;
         }
         aMethodSig.AppendLiteral("[Ljava/lang/String;");
       }
@@ -856,7 +859,7 @@ nsJavaXPTCStub::SetupJavaParams(const nsXPTParamInfo &aParamInfo,
 
     case nsXPTType::T_IID:
     {
-      nsID* iid = nsnull;
+      nsID* iid = nullptr;
       if (!aParamInfo.IsOut()) {  // 'in'
         iid = static_cast<nsID*>(aVariant.val.p);
       } else if (aVariant.val.p) {  // 'inout' & 'out'
@@ -864,7 +867,7 @@ nsJavaXPTCStub::SetupJavaParams(const nsXPTParamInfo &aParamInfo,
         iid = *variant;
       }
 
-      jobject str = nsnull;
+      jobject str = nullptr;
       if (iid) {
         char iid_str[NSID_LENGTH];
         iid->ToProvidedString(iid_str);
@@ -881,12 +884,12 @@ nsJavaXPTCStub::SetupJavaParams(const nsXPTParamInfo &aParamInfo,
       } else {  // 'inout' & 'out'
         if (aVariant.val.p) {
           aJValue.l = env->NewObjectArray(1, stringClass, str);
-          if (aJValue.l == nsnull) {
+          if (aJValue.l == nullptr) {
             rv = NS_ERROR_OUT_OF_MEMORY;
             break;
           }
         } else {
-          aJValue.l = nsnull;
+          aJValue.l = nullptr;
         }
         aMethodSig.AppendLiteral("[Ljava/lang/String;");
       }
@@ -896,7 +899,7 @@ nsJavaXPTCStub::SetupJavaParams(const nsXPTParamInfo &aParamInfo,
     case nsXPTType::T_INTERFACE:
     case nsXPTType::T_INTERFACE_IS:
     {
-      nsISupports* xpcom_obj = nsnull;
+      nsISupports* xpcom_obj = nullptr;
       if (!aParamInfo.IsOut()) {  // 'in'
         xpcom_obj = static_cast<nsISupports*>(aVariant.val.p);
       } else if (aVariant.val.p) {  // 'inout' & 'out'
@@ -912,7 +915,7 @@ nsJavaXPTCStub::SetupJavaParams(const nsXPTParamInfo &aParamInfo,
         break;
 
       // get name of interface
-      char* iface_name = nsnull;
+      char* iface_name = nullptr;
       nsCOMPtr<nsIInterfaceInfoManager>
         iim(do_GetService(NS_INTERFACEINFOMANAGER_SERVICE_CONTRACTID, &rv));
       if (NS_FAILED(rv))
@@ -922,7 +925,7 @@ nsJavaXPTCStub::SetupJavaParams(const nsXPTParamInfo &aParamInfo,
       if (NS_FAILED(rv) || !iface_name)
         break;
 
-      jobject java_stub = nsnull;
+      jobject java_stub = nullptr;
       if (xpcom_obj) {
         // Get matching Java object for given xpcom object
         jobject objLoader = env->CallObjectMethod(mJavaWeakRef, getReferentMID);
@@ -937,12 +940,12 @@ nsJavaXPTCStub::SetupJavaParams(const nsXPTParamInfo &aParamInfo,
       } else {  // 'inout' & 'out'
         if (aVariant.val.p) {
           aJValue.l = env->NewObjectArray(1, nsISupportsClass, java_stub);
-          if (aJValue.l == nsnull) {
+          if (aJValue.l == nullptr) {
             rv = NS_ERROR_OUT_OF_MEMORY;
             break;
           }
         } else {
-          aJValue.l = nsnull;
+          aJValue.l = nullptr;
         }
         aMethodSig.Append('[');
       }
@@ -955,7 +958,7 @@ nsJavaXPTCStub::SetupJavaParams(const nsXPTParamInfo &aParamInfo,
         aMethodSig.AppendLiteral("Lorg/mozilla/interfaces/nsISupports;");
       }
 
-      nsMemory::Free(iface_name);
+      free(iface_name);
     }
     break;
 
@@ -976,9 +979,9 @@ nsJavaXPTCStub::SetupJavaParams(const nsXPTParamInfo &aParamInfo,
         break;
       }
 
-      jstring jstr = nsnull;
+      jstring jstr = nullptr;
       if (!str->IsVoid()) {
-        jstr = env->NewString(str->get(), str->Length());
+        jstr = env->NewString((const jchar *)str->get(), str->Length());
         if (!jstr) {
           rv = NS_ERROR_OUT_OF_MEMORY;
           break;
@@ -1007,7 +1010,7 @@ nsJavaXPTCStub::SetupJavaParams(const nsXPTParamInfo &aParamInfo,
         break;
       }
 
-      jstring jstr = nsnull;
+      jstring jstr = nullptr;
       if (!str->IsVoid()) {
         jstr = env->NewStringUTF(str->get());
         if (!jstr) {
@@ -1038,7 +1041,7 @@ nsJavaXPTCStub::SetupJavaParams(const nsXPTParamInfo &aParamInfo,
           env->SetLongArrayRegion(array, 0, 1, (jlong*) aVariant.val.p);
           aJValue.l = array;
         } else {
-          aJValue.l = nsnull;
+          aJValue.l = nullptr;
         }
         aMethodSig.AppendLiteral("[J");
       }
@@ -1127,7 +1130,7 @@ nsJavaXPTCStub::GetRetvalSig(const nsXPTParamInfo* aParamInfo,
         break;
 
       // get name of interface
-      char* iface_name = nsnull;
+      char* iface_name = nullptr;
       nsCOMPtr<nsIInterfaceInfoManager>
         iim(do_GetService(NS_INTERFACEINFOMANAGER_SERVICE_CONTRACTID, &rv));
       if (NS_FAILED(rv))
@@ -1140,7 +1143,7 @@ nsJavaXPTCStub::GetRetvalSig(const nsXPTParamInfo* aParamInfo,
       aRetvalSig.AppendLiteral("Lorg/mozilla/interfaces/");
       aRetvalSig.AppendASCII(iface_name);
       aRetvalSig.Append(';');
-      nsMemory::Free(iface_name);
+      free(iface_name);
       break;
     }
 
@@ -1306,7 +1309,7 @@ nsJavaXPTCStub::FinalizeJavaParams(const nsXPTParamInfo &aParamInfo,
           *((PRUnichar *) aVariant.val.p) = aJValue.c;
       } else if (aJValue.l) {  // 'inout' & 'out'
         jchar* array = env->GetCharArrayElements((jcharArray) aJValue.l,
-                                                 nsnull);
+                                                 nullptr);
         if (!array) {
           rv = NS_ERROR_OUT_OF_MEMORY;
           break;
@@ -1324,7 +1327,7 @@ nsJavaXPTCStub::FinalizeJavaParams(const nsXPTParamInfo &aParamInfo,
 
     case nsXPTType::T_CHAR_STR:
     {
-      jstring str = nsnull;
+      jstring str = nullptr;
       if (aParamInfo.IsRetval()) {  // 'retval'
         str = (jstring) aJValue.l;
       } else {  // 'inout' & 'out'
@@ -1334,7 +1337,7 @@ nsJavaXPTCStub::FinalizeJavaParams(const nsXPTParamInfo &aParamInfo,
       char** variant = static_cast<char**>(aVariant.val.p);
       if (str) {
         // Get string buffer
-        const char* char_ptr = env->GetStringUTFChars(str, nsnull);
+        const char* char_ptr = env->GetStringUTFChars(str, nullptr);
         if (!char_ptr) {
           rv = NS_ERROR_OUT_OF_MEMORY;
           break;
@@ -1343,13 +1346,13 @@ nsJavaXPTCStub::FinalizeJavaParams(const nsXPTParamInfo &aParamInfo,
         // If new string is different from one passed in, free old string
         // and replace with new string.
         if (aParamInfo.IsRetval() ||
-            *variant == nsnull || strcmp(*variant, char_ptr) != 0)
+            *variant == nullptr || strcmp(*variant, char_ptr) != 0)
         {
           if (!aParamInfo.IsRetval() && *variant)
             PR_Free(*variant);
 
           *variant = strdup(char_ptr);
-          if (*variant == nsnull) {
+          if (*variant == nullptr) {
             rv = NS_ERROR_OUT_OF_MEMORY;
             // don't 'break'; fall through to release chars
           }
@@ -1363,14 +1366,14 @@ nsJavaXPTCStub::FinalizeJavaParams(const nsXPTParamInfo &aParamInfo,
         if (*variant && !aParamInfo.IsRetval()) {
           PR_Free(*variant);
         }
-        *variant = nsnull;
+        *variant = nullptr;
       }
     }
     break;
 
     case nsXPTType::T_WCHAR_STR:
     {
-      jstring str = nsnull;
+      jstring str = nullptr;
       if (aParamInfo.IsRetval()) {  // 'retval'
         str = (jstring) aJValue.l;
       } else {  // 'inout' & 'out'
@@ -1380,7 +1383,7 @@ nsJavaXPTCStub::FinalizeJavaParams(const nsXPTParamInfo &aParamInfo,
       PRUnichar** variant = static_cast<PRUnichar**>(aVariant.val.p);
       if (str) {
         // Get string buffer
-        const jchar* wchar_ptr = env->GetStringChars(str, nsnull);
+        const jchar* wchar_ptr = env->GetStringChars(str, nullptr);
         if (!wchar_ptr) {
           rv = NS_ERROR_OUT_OF_MEMORY;
           break;
@@ -1389,12 +1392,12 @@ nsJavaXPTCStub::FinalizeJavaParams(const nsXPTParamInfo &aParamInfo,
         // If new string is different from one passed in, free old string
         // and replace with new string.  We 
         if (aParamInfo.IsRetval() ||
-            *variant == nsnull || nsCRT::strcmp(*variant, wchar_ptr) != 0)
+            *variant == nullptr || NS_strcmp((const char16_t *)*variant, (const char16_t *)wchar_ptr) != 0)
         {
           if (!aParamInfo.IsRetval() && *variant)
             PR_Free(*variant);
 
-          PRUint32 length = nsCRT::strlen(wchar_ptr);
+          PRUint32 length = NS_strlen((const char16_t *)wchar_ptr);
           *variant = (PRUnichar*) PR_Malloc((length + 1) * sizeof(PRUnichar));
           if (*variant) {
             memcpy(*variant, wchar_ptr, length * sizeof(PRUnichar));
@@ -1413,14 +1416,14 @@ nsJavaXPTCStub::FinalizeJavaParams(const nsXPTParamInfo &aParamInfo,
         if (*variant && !aParamInfo.IsRetval()) {
           PR_Free(*variant);
         }
-        *variant = nsnull;
+        *variant = nullptr;
       }
     }
     break;
 
     case nsXPTType::T_IID:
     {
-      jstring str = nsnull;
+      jstring str = nullptr;
       if (aParamInfo.IsRetval()) {  // 'retval'
         str = (jstring) aJValue.l;
       } else {  // 'inout' & 'out'
@@ -1430,7 +1433,7 @@ nsJavaXPTCStub::FinalizeJavaParams(const nsXPTParamInfo &aParamInfo,
       nsID** variant = static_cast<nsID**>(aVariant.val.p);
       if (str) {
         // Get string buffer
-        const char* char_ptr = env->GetStringUTFChars(str, nsnull);
+        const char* char_ptr = env->GetStringUTFChars(str, nullptr);
         if (!char_ptr) {
           rv = NS_ERROR_OUT_OF_MEMORY;
           break;
@@ -1461,7 +1464,7 @@ nsJavaXPTCStub::FinalizeJavaParams(const nsXPTParamInfo &aParamInfo,
         if (*variant && !aParamInfo.IsRetval()) {
           delete *variant;
         }
-        *variant = nsnull;
+        *variant = nullptr;
       }
     }
     break;
@@ -1469,14 +1472,14 @@ nsJavaXPTCStub::FinalizeJavaParams(const nsXPTParamInfo &aParamInfo,
     case nsXPTType::T_INTERFACE:
     case nsXPTType::T_INTERFACE_IS:
     {
-      jobject java_obj = nsnull;
+      jobject java_obj = nullptr;
       if (aParamInfo.IsRetval()) {  // 'retval'
         java_obj = aJValue.l;
       } else if (aJValue.l) {  // 'inout' & 'out'
         java_obj = env->GetObjectArrayElement((jobjectArray) aJValue.l, 0);
       }
 
-      void* xpcom_obj = nsnull;
+      void* xpcom_obj = nullptr;
       if (java_obj) {
         // Get IID for this param
         nsID iid;
@@ -1517,7 +1520,7 @@ nsJavaXPTCStub::FinalizeJavaParams(const nsXPTParamInfo &aParamInfo,
             xpcom_obj = weakref;
             NS_ADDREF((nsISupports*) xpcom_obj);
           } else {
-            xpcom_obj = nsnull;
+            xpcom_obj = nullptr;
           }
         }
       }
@@ -1551,13 +1554,13 @@ nsJavaXPTCStub::FinalizeJavaParams(const nsXPTParamInfo &aParamInfo,
       
       if (jstr) {
         // Get string buffer
-        const jchar* wchar_ptr = env->GetStringChars(jstr, nsnull);
+        const jchar* wchar_ptr = env->GetStringChars(jstr, nullptr);
         if (!wchar_ptr) {
           rv = NS_ERROR_OUT_OF_MEMORY;
           break;
         }
 
-        variant->Assign(wchar_ptr);
+        variant->Assign((char16_t *)wchar_ptr);
 
         // release String buffer
         env->ReleaseStringChars(jstr, wchar_ptr);
@@ -1581,7 +1584,7 @@ nsJavaXPTCStub::FinalizeJavaParams(const nsXPTParamInfo &aParamInfo,
       
       if (jstr) {
         // Get string buffer
-        const char* char_ptr = env->GetStringUTFChars(jstr, nsnull);
+        const char* char_ptr = env->GetStringUTFChars(jstr, nullptr);
         if (!char_ptr) {
           rv = NS_ERROR_OUT_OF_MEMORY;
           break;

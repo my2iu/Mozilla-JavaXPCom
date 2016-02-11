@@ -34,12 +34,15 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
+#include "mozilla/Char16.h"   // Force include this early to prevent build problems with Windows
+#include "nsIServiceManager.h"
+
 #include "nsJavaInterfaces.h"
 #include "nsJavaWrapper.h"
 #include "nsJavaXPCOMBindingUtils.h"
 #include "nsJavaXPTCStub.h"
 #include "nsIComponentRegistrar.h"
-#include "nsString.h"
+#include "nsStringAPI.h"
 #include "nsISimpleEnumerator.h"
 #include "nsIInterfaceInfoManager.h"
 #include "nsIComponentManager.h"
@@ -73,12 +76,12 @@ InitEmbedding_Impl(JNIEnv* env, jobject aLibXULDirectory,
   nsresult rv;
 
   // create an nsILocalFile from given java.io.File
-  nsCOMPtr<nsILocalFile> libXULDir;
+  nsCOMPtr<nsIFile> libXULDir;
   if (aLibXULDirectory) {
     rv = File_to_nsILocalFile(env, aLibXULDirectory, getter_AddRefs(libXULDir));
     NS_ENSURE_SUCCESS(rv, rv);
   }
-  nsCOMPtr<nsILocalFile> appDir;
+  nsCOMPtr<nsIFile> appDir;
   if (aAppDirectory) {
     rv = File_to_nsILocalFile(env, aAppDirectory, getter_AddRefs(appDir));
     NS_ENSURE_SUCCESS(rv, rv);
@@ -126,7 +129,7 @@ InitXPCOM_Impl(JNIEnv* env, jobject aMozBinDirectory,
   nsresult rv;
 
   // create an nsILocalFile from given java.io.File
-  nsCOMPtr<nsILocalFile> directory;
+  nsCOMPtr<nsIFile> directory;
   if (aMozBinDirectory) {
     rv = File_to_nsILocalFile(env, aMozBinDirectory, getter_AddRefs(directory));
     NS_ENSURE_SUCCESS(rv, rv);
@@ -147,11 +150,11 @@ InitXPCOM_Impl(JNIEnv* env, jobject aMozBinDirectory,
 
   // create Java proxy for service manager returned by NS_InitXPCOM2
   return NativeInterfaceToJavaObject(env, servMan, NS_GET_IID(nsIServiceManager),
-                                     nsnull, aResult);
+                                     nullptr, aResult);
 }
 
 extern "C" NS_EXPORT jobject JNICALL
-XPCOM_NATIVE(initXPCOM) (JNIEnv* env, jobject, jobject aMozBinDirectory,
+XPCOM_NATIVE(initXPCOMNative) (JNIEnv* env, jobject, jobject aMozBinDirectory,
                          jobject aAppFileLocProvider)
 {
   jobject servMan;
@@ -162,20 +165,20 @@ XPCOM_NATIVE(initXPCOM) (JNIEnv* env, jobject, jobject aMozBinDirectory,
 
   ThrowException(env, rv, "Failure in initXPCOM");
   FreeJavaGlobals(env);
-  return nsnull;
+  return nullptr;
 }
 
 extern "C" NS_EXPORT void JNICALL
 XPCOM_NATIVE(shutdownXPCOM) (JNIEnv *env, jobject, jobject aServMgr)
 {
   nsresult rv;
-  nsIServiceManager* servMgr = nsnull;
+  nsIServiceManager* servMgr = nullptr;
   if (aServMgr) {
     // Get native XPCOM instance
-    nsISupports* instancePtr = nsnull;
+    nsISupports* instancePtr = nullptr;
     rv = JavaObjectToNativeInterface(env, aServMgr,
             NS_GET_IID(nsIServiceManager), (void**) &instancePtr);
-    NS_ASSERTION(NS_SUCCEEDED(rv) && instancePtr != nsnull,
+    NS_ASSERTION(NS_SUCCEEDED(rv) && instancePtr != nullptr,
                  "Failed to get XPCOM obj for ServiceMgr.");
     if (NS_SUCCEEDED(rv)) {
       rv = instancePtr->QueryInterface(NS_GET_IID(nsIServiceManager),
@@ -201,30 +204,30 @@ XPCOM_NATIVE(newLocalFile) (JNIEnv *env, jobject, jstring aPath,
                             jboolean aFollowLinks)
 {
   // Create a Mozilla string from the jstring
-  const PRUnichar* buf = nsnull;
+  const jchar* buf = nullptr;
   if (aPath) {
-    buf = env->GetStringChars(aPath, nsnull);
+    buf = env->GetStringChars(aPath, nullptr);
     if (!buf)
-      return nsnull;  // exception already thrown
+      return nullptr;  // exception already thrown
   }
 
-  nsAutoString path_str(buf);
+  nsAutoString path_str(reinterpret_cast<const PRUnichar*>(buf));
   env->ReleaseStringChars(aPath, buf);
 
   // Make call to given function
-  nsCOMPtr<nsILocalFile> file;
+  nsCOMPtr<nsIFile> file;
   nsresult rv = NS_NewLocalFile(path_str, aFollowLinks, getter_AddRefs(file));
 
   if (NS_SUCCEEDED(rv)) {
     jobject javaProxy;
     rv = NativeInterfaceToJavaObject(env, file, NS_GET_IID(nsILocalFile),
-                                     nsnull, &javaProxy);
+                                     nullptr, &javaProxy);
     if (NS_SUCCEEDED(rv))
       return javaProxy;
   }
 
   ThrowException(env, rv, "Failure in newLocalFile");
-  return nsnull;
+  return nullptr;
 }
 
 extern "C" NS_EXPORT jobject JNICALL
@@ -237,13 +240,13 @@ XPCOM_NATIVE(getComponentManager) (JNIEnv *env, jobject)
   if (NS_SUCCEEDED(rv)) {
     jobject javaProxy;
     rv = NativeInterfaceToJavaObject(env, cm, NS_GET_IID(nsIComponentManager),
-                                     nsnull, &javaProxy);
+                                     nullptr, &javaProxy);
     if (NS_SUCCEEDED(rv))
       return javaProxy;
   }
 
   ThrowException(env, rv, "Failure in getComponentManager");
-  return nsnull;
+  return nullptr;
 }
 
 extern "C" NS_EXPORT jobject JNICALL
@@ -256,13 +259,13 @@ XPCOM_NATIVE(getComponentRegistrar) (JNIEnv *env, jobject)
   if (NS_SUCCEEDED(rv)) {
     jobject javaProxy;
     rv = NativeInterfaceToJavaObject(env, cr, NS_GET_IID(nsIComponentRegistrar),
-                                     nsnull, &javaProxy);
+                                     nullptr, &javaProxy);
     if (NS_SUCCEEDED(rv))
       return javaProxy;
   }
 
   ThrowException(env, rv, "Failure in getComponentRegistrar");
-  return nsnull;
+  return nullptr;
 }
 
 extern "C" NS_EXPORT jobject JNICALL
@@ -275,13 +278,13 @@ XPCOM_NATIVE(getServiceManager) (JNIEnv *env, jobject)
   if (NS_SUCCEEDED(rv)) {
     jobject javaProxy;
     rv = NativeInterfaceToJavaObject(env, sm, NS_GET_IID(nsIServiceManager),
-                                     nsnull, &javaProxy);
+                                     nullptr, &javaProxy);
     if (NS_SUCCEEDED(rv))
       return javaProxy;
   }
 
   ThrowException(env, rv, "Failure in getServiceManager");
-  return nsnull;
+  return nullptr;
 }
 
 extern "C" NS_EXPORT jobject JNICALL
@@ -290,7 +293,7 @@ GRE_NATIVE(lockProfileDirectory) (JNIEnv* env, jobject, jobject aDirectory)
   nsresult rv = NS_ERROR_FAILURE;
 
   if (aDirectory) {
-    nsCOMPtr<nsILocalFile> profileDir;
+    nsCOMPtr<nsIFile> profileDir;
     rv = File_to_nsILocalFile(env, aDirectory, getter_AddRefs(profileDir));
 
     if (NS_SUCCEEDED(rv)) {
@@ -314,7 +317,7 @@ GRE_NATIVE(lockProfileDirectory) (JNIEnv* env, jobject, jobject aDirectory)
   }
 
   ThrowException(env, rv, "Failure in lockProfileDirectory");
-  return nsnull;
+  return nullptr;
 }
 
 extern "C" NS_EXPORT void JNICALL
@@ -341,7 +344,7 @@ MOZILLA_NATIVE(getNativeHandleFromAWT) (JNIEnv* env, jobject clazz,
     return 0;
     
   JAWT_DrawingSurface* ds = awt.GetDrawingSurface(env, widget);
-  if (ds != nsnull) {
+  if (ds != nullptr) {
     jint lock = ds->Lock(ds);
     if (!(lock & JAWT_LOCK_ERROR)) {
       JAWT_DrawingSurfaceInfo* dsi = ds->GetDrawingSurfaceInfo(ds);
@@ -367,12 +370,12 @@ JXUTILS_NATIVE(wrapJavaObject) (JNIEnv* env, jobject, jobject aJavaObject,
                                 jstring aIID)
 {
   nsresult rv;
-  void* xpcomObject = nsnull;
+  void* xpcomObject = nullptr;
 
   if (!aJavaObject || !aIID) {
     rv = NS_ERROR_NULL_POINTER;
   } else {
-    const char* str = env->GetStringUTFChars(aIID, nsnull);
+    const char* str = env->GetStringUTFChars(aIID, nullptr);
     if (!str) {
       rv = NS_ERROR_OUT_OF_MEMORY;
     } else {
@@ -401,20 +404,20 @@ JXUTILS_NATIVE(wrapXPCOMObject) (JNIEnv* env, jobject, jlong aXPCOMObject,
                                  jstring aIID)
 {
   nsresult rv;
-  jobject javaObject = nsnull;
+  jobject javaObject = nullptr;
   nsISupports* xpcomObject = reinterpret_cast<nsISupports*>(aXPCOMObject);
 
   if (!xpcomObject || !aIID) {
     rv = NS_ERROR_NULL_POINTER;
   } else {
-    const char* str = env->GetStringUTFChars(aIID, nsnull);
+    const char* str = env->GetStringUTFChars(aIID, nullptr);
     if (!str) {
       rv = NS_ERROR_OUT_OF_MEMORY;
     } else {
       nsID iid;
       if (iid.Parse(str)) {
         // XXX Should we be passing something other than NULL for aObjectLoader?
-        rv = NativeInterfaceToJavaObject(env, xpcomObject, iid, nsnull,
+        rv = NativeInterfaceToJavaObject(env, xpcomObject, iid, nullptr,
                                          &javaObject);
       } else {
         rv = NS_ERROR_INVALID_ARG;

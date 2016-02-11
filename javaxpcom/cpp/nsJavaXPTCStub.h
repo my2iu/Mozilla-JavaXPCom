@@ -38,6 +38,9 @@
 #ifndef _nsJavaXPTCStub_h_
 #define _nsJavaXPTCStub_h_
 
+#include "nscore.h"
+
+
 #include "nsXPTCUtils.h"
 #include "jni.h"
 #include "nsVoidArray.h"
@@ -95,8 +98,8 @@ public:
   
 
 private:
-  NS_IMETHOD_(nsrefcnt) AddRefInternal();
-  NS_IMETHOD_(nsrefcnt) ReleaseInternal();
+  NS_IMETHOD_(MozExternalRefCountType) AddRefInternal();
+  NS_IMETHOD_(MozExternalRefCountType) ReleaseInternal();
 
   // Deletes this object and its members.  Called by ReleaseInternal() and
   // ReleaseWeakRef().
@@ -112,7 +115,7 @@ private:
   nsJavaXPTCStub * FindStubSupportingIID(const nsID &aIID);
 
   // returns true if this stub supports the specified interface
-  PRBool SupportsIID(const nsID &aIID);
+  bool SupportsIID(const nsID &aIID);
 
   nsresult SetupJavaParams(const nsXPTParamInfo &aParamInfo,
                            const XPTMethodDescriptor* aMethodInfo,
