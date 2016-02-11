@@ -1,0 +1,1 @@
+This directory holds the code for javaxpcomglue.dll. I think it was previously used when JavaXPCOM was built directly into Firefox, and you would use the DLL to find Firefox and find the Java bindings. Since JavaXPCOM is not longer baked into the Firefox binaries, it's not needed.
