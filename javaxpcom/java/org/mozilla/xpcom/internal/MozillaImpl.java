@@ -42,11 +42,20 @@ import org.mozilla.xpcom.IMozilla;
 import org.mozilla.xpcom.XPCOMInitializationException;
 
 public class MozillaImpl implements IMozilla {
+   static {
+      System.loadLibrary("javaxpcom");
+   }
+   
+   public native void initialize();
+     
 
 	public void initialize(File aLibXULDirectory)
 	throws XPCOMInitializationException {
-		JavaXPCOMMethods.registerJavaXPCOMMethods(aLibXULDirectory);
-		initializeNative();
+	       initialize();
+	       // used by the old Java XPCOM Glue code
+
+		//JavaXPCOMMethods.registerJavaXPCOMMethods(aLibXULDirectory);
+		//initializeNative();
 	}
 
 	private native void initializeNative();
