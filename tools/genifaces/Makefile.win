@@ -1,0 +1,17 @@
+!include "dirs.mak"
+
+all: GenerateJavaInterfaces.exe
+
+VCDIR=C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC
+WINSDK=C:\Program Files (x86)\Microsoft SDKs\Windows\v7.1A
+GECKODIR=$(GECKOBASE)\obj-i686-pc-mingw32\dist
+
+cc="$(VCDIR)\bin\cl.exe"
+link="$(VCDIR)\bin\link.exe"
+
+.cpp.obj:
+	$(cc) /c $*.cpp /I"$(GECKODIR)\include" /I"$(VCDIR)\include" /I"$(WINSDK)\Include" /I"$(GECKODIR)\nspr-include" /MD /DXP_WIN /DXPCOM_GLUE_USE_NSPR
+
+GenerateJavaInterfaces.exe: GenerateJavaInterfaces.obj
+	$(link) /LIBPATH:"$(VCDIR)\lib" /LIBPATH:"$(WINSDK)\Lib"  /LIBPATH:"$(GECKODIR)\lib" js_static.lib mozalloc.lib xpcomglue_s.lib xul.lib nss3.lib mozcrt.lib  /out:GenerateJavaInterfaces.exe $** 
+
