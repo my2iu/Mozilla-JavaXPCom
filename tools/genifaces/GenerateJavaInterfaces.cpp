@@ -36,8 +36,6 @@
  * ***** END LICENSE BLOCK ***** */
 
 #include "mozilla/Char16.h"   // Force include this early to prevent build problems with Windows
-#define NOMINMAX   // prevents windows from defining min and max
-#include "windows.h"
 #include "nsEmbedString.h"
 #include "nsIEnumerator.h"
 #include <algorithm>

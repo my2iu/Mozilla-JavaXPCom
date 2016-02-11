@@ -10,7 +10,7 @@ cc="$(VCDIR)\bin\cl.exe"
 link="$(VCDIR)\bin\link.exe"
 
 .cpp.obj:
-	$(cc) /c $*.cpp /I"$(GECKODIR)\include" /I"$(VCDIR)\include" /I"$(WINSDK)\Include" /I"$(GECKODIR)\nspr-include" /MD /DXP_WIN /DXPCOM_GLUE_USE_NSPR
+	$(cc) /c $*.cpp /I"$(GECKODIR)\include" /I"$(VCDIR)\include" /I"$(WINSDK)\Include" /I"$(GECKODIR)\nspr-include" /MD /DXP_WIN /DXPCOM_GLUE_USE_NSPR /DWIN32
 
 GenerateJavaInterfaces.exe: GenerateJavaInterfaces.obj
 	$(link) /LIBPATH:"$(VCDIR)\lib" /LIBPATH:"$(WINSDK)\Lib"  /LIBPATH:"$(GECKODIR)\lib" js_static.lib mozalloc.lib xpcomglue_s.lib xul.lib nss3.lib mozcrt.lib  /out:GenerateJavaInterfaces.exe $** 
