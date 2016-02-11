@@ -35,9 +35,19 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
+#include "mozilla/Char16.h"   // Force include this early to prevent build problems with Windows
+#define NOMINMAX   // prevents windows from defining min and max
+#include "windows.h"
+#include "nsEmbedString.h"
+#include "nsIEnumerator.h"
+#include <algorithm>
+#include "prprf.h"
+#include "jsapi.h"
+
 #include "nsXPCOM.h"
 #include "nsStringAPI.h"
 #include "nsILocalFile.h"
+#include "nsIInterfaceInfo.h"
 #include "nsIInterfaceInfoManager.h"
 #include "xptinfo.h"
 #include "nsCOMPtr.h"
@@ -69,7 +79,7 @@ public:
     NS_ENSURE_SUCCESS(rv, rv);
 
     if (!parent) {
-      *aParentInfo = nsnull;
+      *aParentInfo = nullptr;
       *aParentMethodCount = 0;
       *aParentConstCount = 0;
       return NS_OK;
@@ -104,15 +114,14 @@ public:
       // |nsIUnicharInputStream|, which is defined in a simple header file, not
       // an IDL file.
       *aResult = (char*) nsMemory::Clone(isupp_str, sizeof(isupp_str));
-      rv = (*aResult == nsnull) ? NS_ERROR_OUT_OF_MEMORY : NS_OK;
-
+      rv = (*aResult == nullptr) ? NS_ERROR_OUT_OF_MEMORY : NS_OK;
     } else {
 
       // In JavaXPCOM, we handle weak references internally; no need for the
       // |nsIWeakReference| interface.  So just return |nsISupports|.
       if (iid->Equals(NS_GET_IID(nsIWeakReference))) {
         *aResult = (char*) nsMemory::Clone(isupp_str, sizeof(isupp_str));
-        rv = (*aResult == nsnull) ? NS_ERROR_OUT_OF_MEMORY : NS_OK;
+        rv = (*aResult == nullptr) ? NS_ERROR_OUT_OF_MEMORY : NS_OK;
 
       } else {
 
@@ -126,15 +135,15 @@ public:
         NS_ENSURE_SUCCESS(rv, rv);
 
         rv = iim->GetInfoForIID(iid, getter_AddRefs(info));
-        NS_ENSURE_SUCCESS(rv, rv);
+        //NS_ENSURE_SUCCESS(rv, rv);
 
-        PRBool scriptable;
+        bool scriptable;
         if (NS_SUCCEEDED(rv)) {
           info->IsScriptable(&scriptable);
         }
         if (NS_FAILED(rv) || !scriptable) {
           *aResult = (char*) nsMemory::Clone(isupp_str, sizeof(isupp_str));
-          rv = (*aResult == nsnull) ? NS_ERROR_OUT_OF_MEMORY : NS_OK;
+          rv = (*aResult == nullptr) ? NS_ERROR_OUT_OF_MEMORY : NS_OK;
         } else {
 
           // If is scriptable, get name for given IID
@@ -187,28 +196,34 @@ static const char* kNoscriptMethodIfaces[] = {
 
 class Generate
 {
-  nsILocalFile*     mOutputDir;
+  nsIFile*     mOutputDir;
   nsDataHashtable<nsCStringHashKey, PRBool> mIfaceTable;
   nsDataHashtable<nsCStringHashKey, PRBool> mJavaKeywords;
+  JSRuntime *jsRuntime;
+  JSContext *jsCx;
+  
 #ifdef WRITE_NOSCRIPT_METHODS
   nsDataHashtable<nsCStringHashKey, PRBool> mNoscriptMethodsTable;
 #endif
 
 public:
-  Generate(nsILocalFile* aOutputDir)
-    : mOutputDir(aOutputDir)
+  Generate(nsIFile* aOutputDir)
+    : mOutputDir(aOutputDir), 
+    mIfaceTable(100), 
+    mJavaKeywords(MOZ_ARRAY_LENGTH(kJavaKeywords)),
+    mNoscriptMethodsTable(MOZ_ARRAY_LENGTH(kNoscriptMethodIfaces))
   {
-    mIfaceTable.Init(100);
+ 	//JS_Init();  done by initxpcom
+    jsRuntime = JS_NewRuntime(2L * 1024 * 1024);
+    jsCx = JS_NewContext(jsRuntime, 8192);
 
-    PRUint32 size = NS_ARRAY_LENGTH(kJavaKeywords);
-    mJavaKeywords.Init(size);
+    PRUint32 size = MOZ_ARRAY_LENGTH(kJavaKeywords);
     for (PRUint32 i = 0; i < size; i++) {
       mJavaKeywords.Put(nsDependentCString(kJavaKeywords[i]), PR_TRUE);
     }
 
 #ifdef WRITE_NOSCRIPT_METHODS
-    size = NS_ARRAY_LENGTH(kNoscriptMethodIfaces);
-    mNoscriptMethodsTable.Init(size);
+    size = MOZ_ARRAY_LENGTH(kNoscriptMethodIfaces);
     for (PRUint32 j = 0; j < size; j++) {
       mNoscriptMethodsTable.Put(nsDependentCString(kNoscriptMethodIfaces[j]),
                                 PR_TRUE);
@@ -218,6 +233,9 @@ public:
 
   ~Generate()
   {
+  	JS_DestroyContext(jsCx);
+  	JS_DestroyRuntime(jsRuntime);
+  	//JS_ShutDown();
   }
 
   nsresult GenerateInterfaces()
@@ -229,7 +247,10 @@ public:
     NS_ENSURE_SUCCESS(rv, rv);
 
     nsCOMPtr<nsIEnumerator> etor;
-    rv = iim->EnumerateInterfaces(getter_AddRefs(etor));
+// TODO: There's a problem here with Mozilla's strstr() implementation where 
+// the empty string doesn't match any string. I've solved the problem by hacking
+// up Mozilla to return all interfaces here, but there might be a better solution
+    rv = iim->EnumerateInterfacesWhoseNamesStartWith("", getter_AddRefs(etor));
     NS_ENSURE_SUCCESS(rv, rv);
 
     // loop over interfaces
@@ -246,7 +267,7 @@ public:
 
       // we only care about scriptable interfaces, so skip over those
       // that aren't
-      PRBool scriptable;
+      bool scriptable;
       iface->IsScriptable(&scriptable);
       if (!scriptable) {
         // XXX SWT uses non-scriptable interface 'nsIAppShell' (bug 270892), so
@@ -272,7 +293,7 @@ public:
     // write each interface only once
     const char* iface_name;
     aIInfo->GetNameShared(&iface_name);
-    if (mIfaceTable.Get(nsDependentCString(iface_name), nsnull))
+    if (mIfaceTable.Get(nsDependentCString(iface_name), nullptr))
       return NS_OK;
 
     // write any parent interface
@@ -319,14 +340,14 @@ public:
     nsCOMPtr<nsIFile> iface_file;
     rv = mOutputDir->Clone(getter_AddRefs(iface_file));
     NS_ENSURE_SUCCESS(rv, rv);
-    nsCAutoString filename;
+    nsEmbedCString filename;
     filename.Append(aIfaceName);
     filename.Append(NS_LITERAL_CSTRING(".java"));
     rv = iface_file->AppendNative(filename);
     NS_ENSURE_SUCCESS(rv, rv);
 
     // create interface file
-    PRBool exists;
+    bool exists;
     iface_file->Exists(&exists);
     if (exists)
       iface_file->Remove(PR_FALSE);
@@ -357,17 +378,17 @@ public:
       " *\n"
       " * @see <a href=\"http://lxr.mozilla.org/mozilla/search?string=";
     static const char kHeader2[]= "\">\n **/\n\n";
-    static const char kPackage[] = "package org.mozilla.xpcom;\n\n";
+    static const char kPackage[] = "package org.mozilla.interfaces;\n\n";
 
     PRUint32 count;
     nsresult rv = out->Write(kHeader1, sizeof(kHeader1) - 1, &count);
     NS_ENSURE_SUCCESS(rv, rv);
 
-    nsCAutoString searchTerm;
+    nsEmbedCString searchTerm;
     searchTerm.Append(NS_LITERAL_CSTRING("interface+"));
     searchTerm.Append(aIfaceName);
     // LXR limits to 29 chars
-    rv = out->Write(searchTerm.get(), NS_MIN(29U, searchTerm.Length()), &count);
+    rv = out->Write(searchTerm.get(), std::min(29U, searchTerm.Length()), &count);
     NS_ENSURE_SUCCESS(rv, rv);
 
     rv = out->Write(kHeader2, sizeof(kHeader2) - 1, &count);
@@ -416,11 +437,11 @@ public:
     static const char kIIDDecl2[] = " =\n    \"";
     static const char kIIDDecl3[] = "\";\n\n";
 
-    nsIID* iid;
+    const nsIID* iid;
     aIInfo->GetIIDShared(&iid);
 
     // create iid field name
-    nsCAutoString iid_name;
+    nsEmbedCString iid_name;
     const char* iface_name;
     aIInfo->GetNameShared(&iface_name);
     if (strncmp("ns", iface_name, 2) == 0) {
@@ -434,7 +455,8 @@ public:
 
     // get iid string
     char iid_str[NSID_LENGTH];
-    iid->ToProvidedString(iid_str);
+	iidToProvidedString(iid, iid_str);
+    //iid->ToProvidedString(iid_str);
 
     PRUint32 count;
     nsresult rv = out->Write(kIIDDecl1, sizeof(kIIDDecl1) - 1, &count);
@@ -452,6 +474,67 @@ public:
     return NS_OK;
   }
 
+  // The code below was taken from an old version of nsid.h (nsID::ToProvidedString()) that 
+  // was licensed under the same terms as javaxpcom. 
+  void iidToProvidedString(const nsIID* iid, char (&aDest)[NSID_LENGTH]) const
+  {
+  const char gIDFormat[] = 
+  "{%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x}";
+    snprintf(aDest, 39, gIDFormat,
+                iid->m0, (PRUint32) iid->m1, (PRUint32) iid->m2,
+                (PRUint32) iid->m3[0], (PRUint32) iid->m3[1], (PRUint32) iid->m3[2],
+                (PRUint32) iid->m3[3], (PRUint32) iid->m3[4], (PRUint32) iid->m3[5],
+                (PRUint32) iid->m3[6], (PRUint32) iid->m3[7]);
+  }
+		
+  void WriteJsType(nsIOutputStream* out, JS::Rooted<JS::Value> &value)
+  {
+    PRUint32 count;
+	nsresult rv;
+  	if (value.isBoolean())
+      rv = out->Write("boolean", 7, &count);
+    else if (value.isInt32())
+	  rv = out->Write("int", 3, &count);
+	else if (value.isNumber())
+	  rv = out->Write("double", 6, &count);
+	else if (value.isString())
+	  rv = out->Write("String", 6, &count);
+	else
+	  rv = out->Write("jsval", 5, &count);
+  }
+
+  void WriteJsValue(nsIOutputStream* out, JS::Rooted<JS::Value> &value)
+  {
+    char buf[32];
+    PRUint32 count;
+	nsresult rv;
+  	if (value.isBoolean())
+	{
+	  if (value.toBoolean())
+		rv = out->Write("true", 4, &count);
+      else
+		rv = out->Write("false", 5, &count);
+	}
+    else if (value.isInt32())
+	{
+	  snprintf(buf, sizeof(buf), "%d", value.toInt32());
+	  rv = out->Write(buf, strlen(buf), &count);
+	}
+	else if (value.isNumber())
+	{
+	  snprintf(buf, sizeof(buf), "%f", value.toDouble());
+	  rv = out->Write(buf, strlen(buf), &count);
+	}
+	else if (value.isString())
+	{
+	  char stringBuffer[1024];
+	  size_t numBytes = JS_EncodeStringToBuffer(jsCx, value.toString(), stringBuffer, sizeof(stringBuffer));
+	  rv = out->Write(stringBuffer, numBytes, &count);
+	}
+	else
+	  rv = out->Write("?", 1, &count);
+  }
+  	  
   nsresult WriteConstants(nsIOutputStream* out, nsIInterfaceInfo* aIInfo,
                           PRUint16 aParentConstCount)
   {
@@ -463,26 +546,24 @@ public:
     NS_ENSURE_SUCCESS(rv, rv);
 
     for (PRUint16 i = aParentConstCount; i < constCount; i++) {
-      const nsXPTConstant* constInfo;
-      rv = aIInfo->GetConstant(i, &constInfo);
+      JS::Rooted<JS::Value> value(jsCx);
+	  char *constName;
+      
+      rv = aIInfo->GetConstant(i, &value, &constName);
       NS_ENSURE_SUCCESS(rv, rv);
 
       PRUint32 count;
       rv = out->Write("  ", 2, &count);
       NS_ENSURE_SUCCESS(rv, rv);
-      const nsXPTType &type = constInfo->GetType();
-      rv = WriteType(out, &type, aIInfo, nsnull, nsnull);
-      NS_ENSURE_SUCCESS(rv, rv);
+      WriteJsType(out, value);      
       rv = out->Write(" ", 1, &count);
       NS_ENSURE_SUCCESS(rv, rv);
-      const char* name = constInfo->GetName();
+      const char* name = constName;
       rv = out->Write(name, strlen(name), &count);
       NS_ENSURE_SUCCESS(rv, rv);
       rv = out->Write(kConstDecl1, sizeof(kConstDecl1) - 1, &count);
       NS_ENSURE_SUCCESS(rv, rv);
-
-      rv = WriteConstantValue(out, &type, constInfo->GetValue());
-      NS_ENSURE_SUCCESS(rv, rv);
+      WriteJsValue(out, value);
       rv = out->Write(kConstDecl2, sizeof(kConstDecl2) - 1, &count);
       NS_ENSURE_SUCCESS(rv, rv);
     }
@@ -584,7 +665,7 @@ public:
       if (methodInfo->IsHidden()) {
         const char* iface_name;
         aIInfo->GetNameShared(&iface_name);
-        if (!mNoscriptMethodsTable.Get(nsDependentCString(iface_name), nsnull))
+        if (!mNoscriptMethodsTable.Get(nsDependentCString(iface_name), nullptr))
           continue;
       }
 #else
@@ -614,7 +695,7 @@ public:
 
     // write return type
     PRUint8 paramCount = aMethodInfo->GetParamCount();
-    const nsXPTParamInfo* resultInfo = nsnull;
+    const nsXPTParamInfo* resultInfo = nullptr;
     for (PRUint8 i = 0; i < paramCount; i++) {
       const nsXPTParamInfo &paramInfo = aMethodInfo->GetParam(i);
       if (paramInfo.IsRetval()) {
@@ -630,7 +711,7 @@ public:
     NS_ENSURE_SUCCESS(rv, rv);
 
     // write method name string
-    nsCAutoString method_name;
+    nsEmbedCString method_name;
     const char* name = aMethodInfo->GetName();
     if (aMethodInfo->IsGetter() || aMethodInfo->IsSetter()) {
       if (aMethodInfo->IsGetter())
@@ -644,7 +725,7 @@ public:
       method_name.Append(name + 1);
     }
     // don't use Java keywords as method names
-    if (mJavaKeywords.Get(method_name, nsnull)) {
+    if (mJavaKeywords.Get(method_name, nullptr)) {
       method_name.Insert('_', 0);
     }
     rv = out->Write(" ", 1, &count);
@@ -765,7 +846,7 @@ public:
 
       case nsXPTType::T_INTERFACE:
       {
-        char* iface_name = nsnull;
+        char* iface_name = nullptr;
         rv = TypeInfo::GetInterfaceName(aIInfo, aMethodIndex, aParamInfo,
                                         &iface_name);
         if (NS_FAILED(rv) || !iface_name) {
@@ -802,6 +883,10 @@ public:
         break;
       }
 
+      case nsXPTType::T_JSVAL:
+        rv = out->Write("JSVAL", 5, &count);
+        break;
+
       default:
         fprintf(stderr, "WARNING: unexpected parameter type %d\n",
                 aType->TagPart());
@@ -823,7 +908,7 @@ void PrintUsage(char** argv)
 int main(int argc, char** argv)
 {
   nsresult rv = NS_OK;
-  nsCOMPtr<nsILocalFile> output_dir;
+  nsCOMPtr<nsIFile> output_dir;
 
   // handle command line arguments
   for (int i = 1; i < argc; i++) {
@@ -843,7 +928,7 @@ int main(int argc, char** argv)
         // see if given path exists
         rv = NS_NewNativeLocalFile(nsDependentCString(argv[++i]), PR_TRUE,
                                    getter_AddRefs(output_dir));
-        PRBool val;
+        bool val;
         if (NS_FAILED(rv) || NS_FAILED(output_dir->Exists(&val)) || !val ||
             NS_FAILED(output_dir->IsDirectory(&val)) || !val)
         {
@@ -868,13 +953,15 @@ int main(int argc, char** argv)
     PrintUsage(argv);
     return 1;
   }
+  
+  rv = NS_InitXPCOM2(nullptr, nullptr, nullptr);
+  NS_ENSURE_SUCCESS(rv, 1);
 
-  rv = NS_InitXPCOM2(nsnull, nsnull, nsnull);
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  Generate gen(output_dir);
-  rv = gen.GenerateInterfaces();
-
-  NS_ShutdownXPCOM(nsnull);
-  return rv;
+  {
+    Generate gen(output_dir);
+    rv = gen.GenerateInterfaces();
+  }
+  
+  NS_ShutdownXPCOM(nullptr);
+  NS_ENSURE_SUCCESS(rv, 1);
 }
