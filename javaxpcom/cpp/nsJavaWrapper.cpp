@@ -786,9 +786,13 @@ SetupParams(JNIEnv *env, const jobject aParam, PRUint8 aType, PRBool aIsOut,
         rv = JavaObjectToNativeInterface(env, java_obj, iid, &xpcom_obj);
         if (NS_FAILED(rv))
           break;
-        rv = ((nsISupports*) xpcom_obj)->QueryInterface(iid, &xpcom_obj);
+        nsISupports* pre_xpcom_obj = (nsISupports*)xpcom_obj;
+        rv = pre_xpcom_obj->QueryInterface(iid, &xpcom_obj);
         if (NS_FAILED(rv))
           break;
+        // TODO: Is it right to release here after an additional reference was made through QueryInterface?
+        // TODO: Why wasn't this line here before unless this is wrong?
+        NS_RELEASE(pre_xpcom_obj);
 
         // If the function expects a weak reference, then we need to
         // create it here.
@@ -1849,7 +1853,7 @@ GetNewOrUsedJavaWrapper(JNIEnv* env, nsISupports* aXPCOMObject,
       LOG(("+ CreateJavaProxy (Java=%08x | XPCOM=%08x | IID=%s)\n",
            (PRUint32) env->CallStaticIntMethod(systemClass, hashCodeMID,
                                                java_obj),
-           (PRUint32) rootObject, iid_str));
+           (PRUint32) rootObject.get(), iid_str));
       NS_Free(iid_str);
 #endif
 

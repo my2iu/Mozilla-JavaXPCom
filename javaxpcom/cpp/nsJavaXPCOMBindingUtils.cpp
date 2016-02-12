@@ -712,7 +712,7 @@ JavaToXPTCStubMap::Add(jint aJavaObjectHashCode, nsJavaXPTCStub* aProxy)
   LOG(("+ JavaToXPTCStubMap (Java=%08x | XPCOM=%08x | IID=%s)\n",
        (PRUint32) aJavaObjectHashCode, (PRUint32) aProxy, iid_str));
   NS_Free(iid_str);
-  nsMemory::Free(iid);
+  free(iid);
   NS_RELEASE(iface_info);
 #endif
   return NS_OK;
@@ -744,7 +744,7 @@ JavaToXPTCStubMap::Find(jint aJavaObjectHashCode, const nsIID& aIID,
     char* iid_str = aIID.ToString();
     LOG(("< JavaToXPTCStubMap (Java=%08x | XPCOM=%08x | IID=%s)\n",
          (PRUint32) aJavaObjectHashCode, (PRUint32) *aResult, iid_str));
-    PR_Free(iid_str);
+    free(iid_str);
   }
 #endif
 

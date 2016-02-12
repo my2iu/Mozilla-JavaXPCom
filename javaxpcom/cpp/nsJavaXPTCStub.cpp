@@ -115,7 +115,7 @@ nsJavaXPTCStub::AddRef()
   LOG(("= nsJavaXPTCStub::AddRef (XPCOM=%08x | refcnt = %d | IID=%s)\n",
        (int) this, refcnt, iid_str));
   NS_Free(iid_str);
-  nsMemory::Free(iid);
+  free(iid);
 #endif
 
   nsJavaXPTCStub* master = mMaster ? mMaster : this;
@@ -155,7 +155,7 @@ nsJavaXPTCStub::Release()
   LOG(("= nsJavaXPTCStub::Release (XPCOM=%08x | refcnt = %d | IID=%s)\n",
        (int) this, refcnt, iid_str));
   NS_Free(iid_str);
-  nsMemory::Free(iid);
+  free(iid);
 #endif
 
   nsJavaXPTCStub* master = mMaster ? mMaster : this;
@@ -174,7 +174,7 @@ nsJavaXPTCStub::Destroy()
   LOG(("- nsJavaXPTCStub (Java=%08x | XPCOM=%08x | IID=%s)\n",
       (PRUint32) mJavaRefHashCode, (PRUint32) this, iid_str));
   NS_Free(iid_str);
-  nsMemory::Free(iid);
+  free(iid);
 #endif
 
   if (!mMaster) {
@@ -548,12 +548,11 @@ nsJavaXPTCStub::CallMethod(PRUint16 aMethodIndex,
       if (env->IsInstanceOf(exp, xpcomExceptionClass)) {
         jfieldID fid;
         fid = env->GetFieldID(xpcomExceptionClass, "errorcode", "J");
-// TODO: Fix proper error codes		
-//        if (fid) {
-//          rv = env->GetLongField(exp, fid);
-//        } else {
+        if (fid) {
+          rv = static_cast<nsresult>(env->GetLongField(exp, fid));
+        } else {
           rv = NS_ERROR_FAILURE;
-//        }
+        }
         NS_ASSERTION(fid, "Couldn't get 'errorcode' field of XPCOMException");
       } else {
         rv = NS_ERROR_FAILURE;
@@ -593,7 +592,9 @@ nsJavaXPTCStub::CallMethod(PRUint16 aMethodIndex,
 #endif
   env->ExceptionClear();
 
+#ifdef DEBUG_JAVAXPCOM
   LOG(("<--- (Java) %s::%s()\n", ifaceName, aMethodInfo->name));
+#endif
   return rv;
 }
 
@@ -1657,7 +1658,7 @@ nsJavaXPTCStub::GetJavaObject()
   LOG(("< nsJavaXPTCStub (Java=%08x | XPCOM=%08x | IID=%s)\n",
        (PRUint32) mJavaRefHashCode, (PRUint32) this, iid_str));
   NS_Free(iid_str);
-  nsMemory::Free(iid);
+  free(iid);
 #endif
 
   return javaObject;
