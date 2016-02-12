@@ -205,12 +205,11 @@ nsAppFileLocProviderProxy::GetFiles(const char* aProp,
       if (env->IsInstanceOf(exp, xpcomExceptionClass)) {
         jfieldID fid;
         fid = env->GetFieldID(xpcomExceptionClass, "errorcode", "J");
-// TODO: Fix this error handling properly
-//        if (fid) {
-//          rv = env->GetLongField(exp, fid);
-//        } else {
+        if (fid) {
+          rv = static_cast<nsresult>(env->GetLongField(exp, fid));
+        } else {
           rv = NS_ERROR_FAILURE;
-//        }
+        }
         NS_ASSERTION(fid, "Couldn't get 'errorcode' field of XPCOMException");
       } else {
         rv = NS_ERROR_FAILURE;

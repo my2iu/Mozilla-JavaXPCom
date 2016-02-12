@@ -949,9 +949,7 @@ ThrowException(JNIEnv* env, const nsresult aErrorCode, const char* aMessage)
 
   // Create parameters and method signature. Max of 2 params.  The error code
   // comes before the message string.
-// TODO: I'm not sure I'm encoding the error code correctly here.  
-// TODO: In fact, this is almost definitely wrong
-  PRInt64 errorCode = NS_ERROR_GET_CODE(aErrorCode) ? NS_ERROR_GET_CODE(aErrorCode) : NS_ERROR_GET_CODE(NS_ERROR_FAILURE);
+  PRInt64 errorCode = static_cast<uint32_t>(static_cast<uint32_t>(aErrorCode) ? aErrorCode : NS_ERROR_FAILURE);
   nsEmbedCString methodSig("(J");
   jstring message = nullptr;
   if (aMessage) {
