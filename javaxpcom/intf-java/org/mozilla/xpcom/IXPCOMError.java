@@ -7,5 +7,5 @@ package org.mozilla.xpcom;
  */
 public interface IXPCOMError
 {
-
+   public static final int NS_ERROR_FAILURE = 0x80004005;
 }
