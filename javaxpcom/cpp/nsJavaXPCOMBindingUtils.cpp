@@ -460,7 +460,7 @@ FreeJavaGlobals(JNIEnv* env)
 nsresult
 NativeToJavaProxyMap::Init()
 {
-  mHashTable = PL_NewDHashTable(PL_DHashGetStubOps(), nullptr,
+  mHashTable = PL_NewDHashTable(PL_DHashGetStubOps(), 
                                 sizeof(Entry), 16);
   if (!mHashTable)
     return NS_ERROR_OUT_OF_MEMORY;
@@ -526,9 +526,7 @@ NativeToJavaProxyMap::Add(JNIEnv* env, nsISupports* aXPCOMObject,
 {
   nsAutoLock lock(gJavaXPCOMLock);
 
-  Entry* e = static_cast<Entry*>(PL_DHashTableOperate(mHashTable,
-                                                         aXPCOMObject,
-                                                         PL_DHASH_ADD));
+  Entry* e = static_cast<Entry*>(PL_DHashTableAdd(mHashTable, aXPCOMObject));
   if (!e)
     return NS_ERROR_FAILURE;
 
@@ -566,11 +564,10 @@ NativeToJavaProxyMap::Find(JNIEnv* env, nsISupports* aNativeObject,
   nsAutoLock lock(gJavaXPCOMLock);
 
   *aResult = nullptr;
-  Entry* e = static_cast<Entry*>(PL_DHashTableOperate(mHashTable,
-                                                         aNativeObject,
-                                                         PL_DHASH_LOOKUP));
+  Entry* e = static_cast<Entry*>(PL_DHashTableSearch(mHashTable,
+                                                         aNativeObject));
 
-  if (PL_DHASH_ENTRY_IS_FREE(e))
+  if (!e)
     return NS_OK;
 
   ProxyList* item = e->list;
@@ -603,11 +600,10 @@ NativeToJavaProxyMap::Remove(JNIEnv* env, nsISupports* aNativeObject,
   // This is only called from finalizeProxy(), which already holds the lock.
   //  nsAutoLock lock(gJavaXPCOMLock);
 
-  Entry* e = static_cast<Entry*>(PL_DHashTableOperate(mHashTable,
-                                                         aNativeObject,
-                                                         PL_DHASH_LOOKUP));
+  Entry* e = static_cast<Entry*>(PL_DHashTableSearch(mHashTable,
+                                                         aNativeObject));
 
-  if (PL_DHASH_ENTRY_IS_FREE(e)) {
+  if (!e) {
     NS_WARNING("XPCOM object not found in hash table");
     return NS_ERROR_FAILURE;
   }
@@ -630,7 +626,7 @@ NativeToJavaProxyMap::Remove(JNIEnv* env, nsISupports* aNativeObject,
       if (item == e->list) {
         e->list = item->next;
         if (e->list == nullptr)
-          PL_DHashTableOperate(mHashTable, aNativeObject, PL_DHASH_REMOVE);
+          PL_DHashTableRemove(mHashTable, aNativeObject);
       } else {
         last->next = item->next;
       }
@@ -650,7 +646,7 @@ NativeToJavaProxyMap::Remove(JNIEnv* env, nsISupports* aNativeObject,
 nsresult
 JavaToXPTCStubMap::Init()
 {
-  mHashTable = PL_NewDHashTable(PL_DHashGetStubOps(), nullptr,
+  mHashTable = PL_NewDHashTable(PL_DHashGetStubOps(), 
                                 sizeof(Entry), 16);
   if (!mHashTable)
     return NS_ERROR_OUT_OF_MEMORY;
@@ -692,9 +688,8 @@ JavaToXPTCStubMap::Add(jint aJavaObjectHashCode, nsJavaXPTCStub* aProxy)
   nsAutoLock lock(gJavaXPCOMLock);
 
   Entry* e = static_cast<Entry*>
-                        (PL_DHashTableOperate(mHashTable,
-                                           NS_INT32_TO_PTR(aJavaObjectHashCode),
-                                           PL_DHASH_ADD));
+                        (PL_DHashTableAdd(mHashTable,
+                                          NS_INT32_TO_PTR(aJavaObjectHashCode)));
   if (!e)
     return NS_ERROR_FAILURE;
 
@@ -730,11 +725,10 @@ JavaToXPTCStubMap::Find(jint aJavaObjectHashCode, const nsIID& aIID,
 
   *aResult = nullptr;
   Entry* e = static_cast<Entry*>
-                        (PL_DHashTableOperate(mHashTable,
-                                           NS_INT32_TO_PTR(aJavaObjectHashCode),
-                                           PL_DHASH_LOOKUP));
+                        (PL_DHashTableSearch(mHashTable,
+                                           NS_INT32_TO_PTR(aJavaObjectHashCode)));
 
-  if (PL_DHASH_ENTRY_IS_FREE(e))
+  if (!e)
     return NS_OK;
 
   nsresult rv = e->xptcstub->QueryInterface(aIID, (void**) aResult);
@@ -757,8 +751,7 @@ JavaToXPTCStubMap::Find(jint aJavaObjectHashCode, const nsIID& aIID,
 nsresult
 JavaToXPTCStubMap::Remove(jint aJavaObjectHashCode)
 {
-  PL_DHashTableOperate(mHashTable, NS_INT32_TO_PTR(aJavaObjectHashCode),
-                       PL_DHASH_REMOVE);
+  PL_DHashTableRemove(mHashTable, NS_INT32_TO_PTR(aJavaObjectHashCode));
 
 #ifdef DEBUG_JAVAXPCOM
   LOG(("- JavaToXPTCStubMap (Java=%08x)\n", (PRUint32) aJavaObjectHashCode));

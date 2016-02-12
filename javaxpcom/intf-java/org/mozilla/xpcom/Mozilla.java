@@ -628,20 +628,19 @@ IXPCOMError {
    */
   public void initialize(File aLibXULDirectory)
   throws XPCOMInitializationException {
-    File jar = new File(aLibXULDirectory, JAVAXPCOM_JAR);
-    if (!jar.exists()) {
-      throw new XPCOMInitializationException("Could not find " + JAVAXPCOM_JAR +
-          " in " + aLibXULDirectory);
-    }
-
-    URL[] urls = new URL[1];
-    try {
-      urls[0] = jar.toURL();
-    } catch (MalformedURLException e) {
-      throw new XPCOMInitializationException(e);
-    }
-    ClassLoader loader = new URLClassLoader(urls,
-            this.getClass().getClassLoader());
+//    File jar = new File(aLibXULDirectory, JAVAXPCOM_JAR);
+//    if (!jar.exists()) {
+//      throw new XPCOMInitializationException("Could not find " + JAVAXPCOM_JAR +
+//          " in " + aLibXULDirectory);
+//    }
+//
+//    URL[] urls = new URL[1];
+//    try {
+//      urls[0] = jar.toURL();
+//    } catch (MalformedURLException e) {
+//      throw new XPCOMInitializationException(e);
+//    }
+    ClassLoader loader = this.getClass().getClassLoader();
 
     try {
       Class mozillaClass = Class.forName("org.mozilla.xpcom.internal.MozillaImpl",
