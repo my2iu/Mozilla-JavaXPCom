@@ -10,7 +10,8 @@ GECKOBASE= ...
 
 that points to the base of your Gecko source code. You also need to make two changes to the Gecko source code.
 
-- There's a problem getting `EnumerateInterfacesWhoseNamesStartWith()` to return all XPCOM interfaces. You can either hack up that method to return all the interfaces without filtering them, or possibly fix up `nsprpub\lib\libc\src\strstr.c` to allow an empty string to match all strings.
+- There's a problem getting `EnumerateInterfacesWhoseNamesStartWith()` in
+`xpcom/reflect/xptinfo/XPTInterfaceInfoManager.cpp` to return all XPCOM interfaces. You can either hack up that method to return all the interfaces without filtering them, or possibly fix up `nsprpub\lib\libc\src\strstr.c` to allow an empty string to match all strings for `PL_strnstr()`.
 
 - XPCOM now requires you to have JavaScript support to read constants. But access to the JavaScript interfaces is blocked by default in Firefox. You have to remove MOZ_DISABLE_EXPORT_JS=1 from the Firefox build files to get the JavaScript interfaces exported so they can be used here
 
